@@ -22,6 +22,8 @@ app.get("/", (req, res) => {
 const testRoutes = require("./routes/test.routes");
 app.use("/api", testRoutes);
 
+const itemRoutes = require("./routes/items.routes");
+app.use("/api", itemRoutes);
 
 // Get port from env or default to 4000
 const PORT = process.env.PORT || 4000;
