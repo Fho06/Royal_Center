@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 /* ---------- TYPES ---------- */
 
 type Item = {
-  id: number;
+  id: string;
   name: string;
   price: number;
   stock: number;
@@ -22,13 +22,6 @@ type Category = {
   name: string;
   level: number;
   parent_id: number | null;
-};
-
-type CartItem = {
-  item_id: number;
-  name: string;
-  price: number;
-  quantity: number;
 };
 
 /* ---------- COMPONENT ---------- */
@@ -53,17 +46,27 @@ export default function HomePage() {
   /* ---------- PAGINATION ---------- */
   const ITEMS_PER_PAGE = 20;
   const [currentPage, setCurrentPage] = useState(1);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, sortOrder, inStockOnly, selectedCategory, selectedSubcategory]);
+  const [totalItems, setTotalItems] = useState(0);
 
   /* ---------- DATA FETCH ---------- */
 
   async function fetchItems() {
     try {
-      const data = await apiRequest("/items");
-      setItems(data);
+      const params = new URLSearchParams({
+        limit: ITEMS_PER_PAGE.toString(),
+        offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
+      });
+
+      if (search) params.append("search", search);
+      if (inStockOnly) params.append("in_stock", "1");
+      if (selectedCategory !== "all") params.append("category_id", selectedCategory);
+      if (selectedSubcategory !== "all") params.append("subcategory_id", selectedSubcategory);
+      if (sortOrder !== "none") params.append("sort", sortOrder);
+
+      const data = await apiRequest(`/items?${params.toString()}`);
+
+      setItems(data.items);
+      setTotalItems(data.total);
     } catch (err: any) {
       setError(err.message);
     }
@@ -78,8 +81,20 @@ export default function HomePage() {
     }
   }
 
+  /* ---------- EFFECTS ---------- */
+
   useEffect(() => {
     fetchItems();
+  }, [
+    search,
+    sortOrder,
+    inStockOnly,
+    selectedCategory,
+    selectedSubcategory,
+    currentPage,
+  ]);
+
+  useEffect(() => {
     fetchCategories();
   }, []);
 
@@ -87,44 +102,18 @@ export default function HomePage() {
 
   const mainCategories = categories.filter(c => c.level === 1);
 
-  const subCategories = categories.filter(
-    c => c.level === 2 && c.parent_id === Number(selectedCategory)
-  );
+  const subCategories =
+    selectedCategory === "all"
+      ? []
+      : categories.filter(
+          c => c.level === 2 && c.parent_id === Number(selectedCategory)
+        );
 
-  const filteredItems = items.filter(item => {
-    const matchesSearch = item.name
-      .toLowerCase()
-      .includes(search.toLowerCase());
-
-    const hasStock = !inStockOnly || item.stock > 0;
-
-    const matchesCategory =
-      selectedCategory === "all" ||
-      item.parent_id === Number(selectedCategory);
-
-    const matchesSubcategory =
-      selectedSubcategory === "all" ||
-      item.category_id === Number(selectedSubcategory);
-
-    return matchesSearch && hasStock && matchesCategory && matchesSubcategory;
-  });
-
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    if (sortOrder === "asc") return a.price - b.price;
-    if (sortOrder === "desc") return b.price - a.price;
-    return 0;
-  });
-
-  const totalPages = Math.ceil(sortedItems.length / ITEMS_PER_PAGE);
-
-  const paginatedItems = sortedItems.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
 
   /* ---------- CART HELPERS ---------- */
 
-  function cartQuantity(itemId: number) {
+  function cartQuantity(itemId: string) {
     return cart.find(c => c.item_id === itemId)?.quantity || 0;
   }
 
@@ -135,6 +124,7 @@ export default function HomePage() {
   function addToCart(item: Item) {
     setCart(prev => {
       const existing = prev.find(c => c.item_id === item.id);
+
       if (existing) {
         if (existing.quantity >= item.stock) return prev;
         return prev.map(c =>
@@ -143,17 +133,22 @@ export default function HomePage() {
             : c
         );
       }
+
       if (item.stock === 0) return prev;
-      return [...prev, {
-        item_id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: 1
-      }];
+
+      return [
+        ...prev,
+        {
+          item_id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: 1,
+        },
+      ];
     });
   }
 
-  function increaseQuantity(itemId: number, maxStock: number) {
+  function increaseQuantity(itemId: string, maxStock: number) {
     setCart(prev =>
       prev.map(c =>
         c.item_id === itemId && c.quantity < maxStock
@@ -163,7 +158,7 @@ export default function HomePage() {
     );
   }
 
-  function decreaseQuantity(itemId: number) {
+  function decreaseQuantity(itemId: string) {
     setCart(prev =>
       prev
         .map(c =>
@@ -190,9 +185,9 @@ export default function HomePage() {
         body: JSON.stringify({
           items: cart.map(c => ({
             item_id: c.item_id,
-            quantity: c.quantity
-          }))
-        })
+            quantity: c.quantity,
+          })),
+        }),
       });
 
       setCart([]);
@@ -216,7 +211,18 @@ export default function HomePage() {
       <div className="md:col-span-2">
         <h1 className="mb-4 text-2xl font-bold">Products</h1>
 
-        {/* SEARCH */}
+        {message && (
+          <div className="mb-4 rounded border border-green-300 bg-green-50 px-4 py-2 text-green-700">
+            {message}
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-4 rounded border border-red-300 bg-red-50 px-4 py-2 text-red-700">
+            {error}
+          </div>
+        )}
+
         <input
           className="mb-4 w-full rounded border px-4 py-2"
           placeholder="Search products..."
@@ -224,7 +230,6 @@ export default function HomePage() {
           onChange={e => setSearch(e.target.value)}
         />
 
-        {/* CATEGORY FILTERS */}
         <div className="mb-4 flex gap-4">
           <select
             className="rounded border px-3 py-2"
@@ -232,6 +237,7 @@ export default function HomePage() {
             onChange={e => {
               setSelectedCategory(e.target.value);
               setSelectedSubcategory("all");
+              setCurrentPage(1);
             }}
           >
             <option value="all">All Categories</option>
@@ -244,7 +250,10 @@ export default function HomePage() {
             <select
               className="rounded border px-3 py-2"
               value={selectedSubcategory}
-              onChange={e => setSelectedSubcategory(e.target.value)}
+              onChange={e => {
+                setSelectedSubcategory(e.target.value);
+                setCurrentPage(1);
+              }}
             >
               <option value="all">All Subcategories</option>
               {subCategories.map(c => (
@@ -254,12 +263,14 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* SORT + STOCK */}
         <div className="mb-4 flex items-center gap-4">
           <select
             className="rounded border px-3 py-2"
             value={sortOrder}
-            onChange={e => setSortOrder(e.target.value as any)}
+            onChange={e => {
+              setSortOrder(e.target.value as any);
+              setCurrentPage(1);
+            }}
           >
             <option value="none">Sort by price</option>
             <option value="asc">Low → High</option>
@@ -270,19 +281,21 @@ export default function HomePage() {
             <input
               type="checkbox"
               checked={inStockOnly}
-              onChange={e => setInStockOnly(e.target.checked)}
+              onChange={e => {
+                setInStockOnly(e.target.checked);
+                setCurrentPage(1);
+              }}
             />
             In stock only
           </label>
         </div>
 
         <p className="mb-2 text-sm text-gray-500">
-          Showing {sortedItems.length} of {items.length}
+          Showing {items.length} of {totalItems}
         </p>
 
-        {/* GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {paginatedItems.map(item => (
+          {items.map(item => (
             <div key={item.id} className="border rounded p-4">
               <h2 className="font-semibold">{item.name}</h2>
               <p>${item.price.toFixed(2)}</p>
@@ -302,7 +315,6 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* PAGINATION */}
         {totalPages > 1 && (
           <div className="mt-6 flex justify-center gap-4">
             <button
