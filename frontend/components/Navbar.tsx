@@ -3,15 +3,17 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { logout, getToken } from "@/lib/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function Navbar() {
   const [loggedIn, setLoggedIn] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
+  // Re-check auth whenever the route changes
   useEffect(() => {
     setLoggedIn(!!getToken());
-  }, []);
+  }, [pathname]);
 
   function handleLogout() {
     logout();
