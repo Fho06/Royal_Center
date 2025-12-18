@@ -24,9 +24,52 @@ export default function HomePage() {
   const [items, setItems] = useState<Item[]>([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [search, setSearch] = useState("");
   const { cart, setCart } = useCart();
   const router = useRouter();
+  //filter
+  const [sortOrder, setSortOrder] = useState<"none" | "asc" | "desc">("none");
+  const [inStockOnly, setInStockOnly] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("all");
 
+  //Pagination
+  const ITEMS_PER_PAGE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, sortOrder, inStockOnly]);
+
+  
+  const filteredItems = items.filter((item) => {
+    const matchesSearch = item.name
+      .toLowerCase()
+      .includes(search.toLowerCase());
+
+    const hasStock = !inStockOnly || item.stock > 0;
+
+    return matchesSearch && hasStock;
+  });
+
+
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    if (sortOrder === "asc") {
+      return a.price - b.price;
+    }
+    if (sortOrder === "desc") {
+      return b.price - a.price;
+    }
+    return 0;
+  });
+
+  const totalPages = Math.ceil(sortedItems.length / ITEMS_PER_PAGE);
+
+  const paginatedItems = sortedItems.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
     async function fetchItems() {
       try {
@@ -90,7 +133,6 @@ function decreaseQuantity(itemId: number) {
   );
 }
 
-
 function cartQuantity(itemId: number) {
   return cart.find((c) => c.item_id === itemId)?.quantity || 0;
 }
@@ -98,7 +140,6 @@ function cartQuantity(itemId: number) {
 function remainingStock(item: Item) {
   return item.stock - cartQuantity(item.id);
 }
-
 
   async function placeOrder() {
     setError("");
@@ -132,6 +173,7 @@ function remainingStock(item: Item) {
     (sum, item) => sum + item.price * item.quantity,
     0
   );
+  
 
   return (
     <main className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -139,11 +181,58 @@ function remainingStock(item: Item) {
       <div className="md:col-span-2">
         <h1 className="mb-4 text-2xl font-bold">Products</h1>
 
+        {/* 🔍 SEARCH BAR */}
+        <div className="mb-6">
+          <input
+            type="text"
+            placeholder="Search products..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded border px-4 py-2"
+          />
+        </div>
+
+        {/* 🔽 SORT */}
+        <div className="mb-6">
+          <select
+            value={sortOrder}
+            onChange={(e) =>
+              setSortOrder(e.target.value as "none" | "asc" | "desc")
+            }
+            className="rounded border px-3 py-2"
+          >
+            <option value="none">Sort by price</option>
+            <option value="asc">Price: Low → High</option>
+            <option value="desc">Price: High → Low</option>
+          </select>
+            {/* ✅ IN STOCK FILTER */}
+          <div className="mb-6 flex items-center gap-2">
+            
+            <input
+              type="checkbox"
+              id="inStockOnly"
+              checked={inStockOnly}
+              onChange={(e) => setInStockOnly(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <label htmlFor="inStockOnly" className="text-sm">
+              In stock only
+              
+            </label>
+            
+          </div>
+        </div>
+
         {error && <p className="text-red-600">{error}</p>}
         {message && <p className="text-green-600">{message}</p>}
+        
+        <p className="mb-4 text-sm text-gray-500">
+          Showing {sortedItems.length} of {items.length} products
+        </p>
 
+      { /* PRODUCT GRID */}      
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {items.map((item) => (
+          {paginatedItems.map((item) => (
             <div
               key={item.id}
               className="rounded border p-4 shadow-sm"
@@ -171,8 +260,43 @@ function remainingStock(item: Item) {
             </div>
           ))}
         </div>
-      </div>
+        {/* PAGINATION */}
+        {totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-center gap-4">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className={`rounded px-3 py-1 border ${
+                currentPage === 1
+                  ? "cursor-not-allowed text-gray-400"
+                  : "hover:bg-gray-100"
+              }`}
+            >
+              Previous
+            </button>
 
+            <span className="text-sm">
+              Page {currentPage} of {totalPages}
+            </span>
+
+            <button
+              onClick={() =>
+                setCurrentPage((p) => Math.min(totalPages, p + 1))
+              }
+              disabled={currentPage === totalPages}
+              className={`rounded px-3 py-1 border ${
+                currentPage === totalPages
+                  ? "cursor-not-allowed text-gray-400"
+                  : "hover:bg-gray-100"
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        )}
+
+      </div>
+      
       {/* CART */}
       <div className="rounded border p-4">
         <h2 className="mb-2 text-xl font-semibold">Cart</h2>
