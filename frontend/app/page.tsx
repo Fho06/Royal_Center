@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { useCart } from "@/context/CartContext";
 import { isLoggedIn } from "@/lib/auth";
-import { useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+
 
 /* ---------- TYPES ---------- */
 
@@ -29,6 +30,7 @@ type Category = {
 export default function HomePage() {
   const router = useRouter();
   const { cart, setCart } = useCart();
+  const searchParams = useSearchParams();
 
   /* ---------- STATE ---------- */
   const [items, setItems] = useState<Item[]>([]);
@@ -36,16 +38,16 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const [search, setSearch] = useState("");
-  const [sortOrder, setSortOrder] = useState<"none" | "asc" | "desc">("none");
-  const [inStockOnly, setInStockOnly] = useState(false);
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [sortOrder, setSortOrder] = useState<"none" | "asc" | "desc">(searchParams.get("sort") as any || "none");
+  const [inStockOnly, setInStockOnly] = useState(searchParams.get("in_stock") === "1");
 
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedSubcategory, setSelectedSubcategory] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get("category") || "all");
+  const [selectedSubcategory, setSelectedSubcategory] = useState(searchParams.get("subcategory") || "all");
 
   /* ---------- PAGINATION ---------- */
   const ITEMS_PER_PAGE = 20;
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(Number(searchParams.get("page")) || 1);
   const [totalItems, setTotalItems] = useState(0);
 
   /* ---------- DATA FETCH ---------- */
@@ -81,7 +83,42 @@ export default function HomePage() {
     }
   }
 
+  /* ---------- URL SYNC ---------- */
+  function syncUrl(params: Record<string, string | null>) {
+    const url = new URL(window.location.href);
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (!value || value === "all" || value === "none") {
+        url.searchParams.delete(key);
+      } else {
+        url.searchParams.set(key, value);
+      }
+    });
+
+    router.replace(url.pathname + "?" + url.searchParams.toString(), {
+      scroll: false
+    });
+  }
+
+
   /* ---------- EFFECTS ---------- */
+  useEffect(() => {
+    syncUrl({
+      search,
+      sort: sortOrder,
+      inStock: inStockOnly ? "1" : null,
+      category: selectedCategory,
+      subcategory: selectedSubcategory,
+      page: currentPage.toString()
+    });
+  }, [
+    search,
+    sortOrder,
+    inStockOnly,
+    selectedCategory,
+    selectedSubcategory,
+    currentPage
+  ]);
 
   useEffect(() => {
     fetchItems();
