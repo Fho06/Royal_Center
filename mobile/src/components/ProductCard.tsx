@@ -17,6 +17,7 @@ export function ProductCard({ item }: { item: Item }) {
   );
 }
 
+
 const styles = StyleSheet.create({
   card: {
     padding: 12,

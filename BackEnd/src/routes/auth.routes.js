@@ -8,9 +8,11 @@ const router = express.Router();
 router.post("/register", async (req, res) => {
   try {
     const { email, password } = req.body;
+    const emailNormalized = email.trim().toLowerCase();
+
 
     // Basic validation
-    if (!email || !password) {
+    if (!emailNormalized || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
@@ -23,7 +25,7 @@ router.post("/register", async (req, res) => {
     // Check if user already exists
     const existingUser = await pool
       .request()
-      .input("email", sql.VarChar, email)
+      .input("email", sql.VarChar, emailNormalized)
       .query("SELECT id FROM users WHERE email = @email");
 
     if (existingUser.recordset.length > 0) {
@@ -37,7 +39,7 @@ router.post("/register", async (req, res) => {
     // Insert user
     await pool
       .request()
-      .input("email", sql.VarChar, email)
+      .input("email", sql.VarChar, emailNormalized)
       .input("password_hash", sql.VarChar, passwordHash)
       .input("role", sql.VarChar, "user")
       .query(`
@@ -62,9 +64,11 @@ const jwt = require("jsonwebtoken");
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
+    const emailNormalized = email.trim().toLowerCase();
+
 
     // Validation
-    if (!email || !password) {
+    if (!emailNormalized || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
@@ -73,7 +77,7 @@ router.post("/login", async (req, res) => {
     // Find user
     const result = await pool
       .request()
-      .input("email", sql.VarChar, email)
+      .input("email", sql.VarChar, emailNormalized)
       .query(`
         SELECT id, email, password_hash, role
         FROM users
