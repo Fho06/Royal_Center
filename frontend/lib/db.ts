@@ -15,6 +15,9 @@ const config: sql.config = {
     idleTimeoutMillis: 30000,
   },
 };
+if (!process.env.AZ_DB_SERVER) {
+  throw new Error("AZ_DB_SERVER is not defined");
+}
 
 let pool: sql.ConnectionPool | null = null;
 
