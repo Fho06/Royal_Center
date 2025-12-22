@@ -1,6 +1,11 @@
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
+/**
+ * Centralized API request helper
+ * - Works in local dev and production
+ * - Uses same-origin Next.js API routes by default
+ * - Automatically attaches auth token if present
+ */
 export async function apiRequest(
   endpoint: string,
   options: RequestInit = {}
