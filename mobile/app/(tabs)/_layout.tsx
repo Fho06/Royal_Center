@@ -8,7 +8,7 @@ export default function TabsLayout() {
         options={{ title: "Shop" }}
       />
       <Tabs.Screen
-        name="explore"
+        name="cart"
         options={{ title: "Cart" }}
       />
       <Tabs.Screen
