@@ -1,5 +1,5 @@
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "";
+  process.env.NEXT_PUBLIC_API_URL || ""; // kept for deployment
 
 export async function apiRequest(
   endpoint: string,
