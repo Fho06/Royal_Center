@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
   const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -16,60 +15,62 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      const data = await apiRequest("/register", {
+      await apiRequest("/register", {
         method: "POST",
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(), // optional frontend normalize
+          password,
+        }),
       });
 
-      localStorage.setItem("token", data.token);
-      router.push("/");
+      router.push("/login");
     } catch (err: any) {
       setError(err.message);
     }
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded border p-6 shadow"
+        className="w-full max-w-sm space-y-4 rounded border p-6"
       >
-        <h1 className="mb-4 text-2xl font-bold">Create Account</h1>
+        <h1 className="text-xl font-semibold">Create Account</h1>
 
-        {error && <p className="mb-3 text-red-600">{error}</p>}
+        {error && <p className="text-red-600">{error}</p>}
 
         <input
           type="email"
           placeholder="Email"
-          className="mb-3 w-full rounded border px-3 py-2"
+          className="w-full rounded border p-2"
           value={email}
-          onChange={e => setEmail(e.target.value)}
+          onChange={(e) => setEmail(e.target.value)}
           required
         />
 
         <input
           type="password"
-          placeholder="Password"
-          className="mb-4 w-full rounded border px-3 py-2"
+          placeholder="Password (min 6 chars)"
+          className="w-full rounded border p-2"
           value={password}
-          onChange={e => setPassword(e.target.value)}
+          onChange={(e) => setPassword(e.target.value)}
           required
         />
 
         <button
           type="submit"
-          className="w-full rounded bg-black py-2 text-white"
+          className="w-full rounded bg-black p-2 text-white"
         >
-          Sign Up
+          Register
         </button>
 
-        <p className="mt-4 text-sm">
+        <p className="text-sm">
           Already have an account?{" "}
           <a href="/login" className="underline">
-            Log in
+            Go back to login
           </a>
         </p>
       </form>
-    </main>
+    </div>
   );
 }

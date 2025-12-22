@@ -18,7 +18,10 @@ export default function LoginPage() {
     try {
       const data = await apiRequest("/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(), // optional frontend normalize
+          password,
+        }),
       });
 
       saveToken(data.token);
@@ -29,20 +32,12 @@ export default function LoginPage() {
   }
 
   return (
-    
     <div className="flex min-h-screen items-center justify-center">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-sm space-y-4 rounded border p-6"
       >
-        
         <h1 className="text-xl font-semibold">Login</h1>
-          <p className="mt-4 text-sm">
-            Don’t have an account?{" "}
-            <a href="/register" className="underline">
-              Sign up
-            </a>
-          </p>
 
         {error && <p className="text-red-600">{error}</p>}
 
@@ -70,6 +65,13 @@ export default function LoginPage() {
         >
           Log In
         </button>
+
+        <p className="text-sm">
+          Don’t have an account?{" "}
+          <a href="/register" className="underline">
+            Sign up
+          </a>
+        </p>
       </form>
     </div>
   );

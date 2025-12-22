@@ -1,43 +1,47 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { Item } from "../types/item";
+import { useCartStore } from "../store/cartStore";
+import { commonStyles } from "../styles/common.styles";
 
 export function ProductCard({ item }: { item: Item }) {
+  const addItem = useCartStore((s) => s.addItem);
+  const quantityInCart = useCartStore((s) =>
+    s.getQuantity(item.id)
+  );
+
+  const remainingStock = item.stock - quantityInCart;
+  const outOfStock = remainingStock <= 0;
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.name}>{item.name}</Text>
+    <View style={commonStyles.card}>
+      <View style={commonStyles.cardInfo}>
+        <Text style={commonStyles.title}>{item.name}</Text>
+        <Text style={commonStyles.price}>
+          ${item.price.toFixed(2)} / {item.unit}
+        </Text>
+        <Text style={commonStyles.mutedText}>
+          {remainingStock > 0
+            ? `${remainingStock} in stock`
+            : "Out of stock"}
+        </Text>
+      </View>
 
-      <Text style={styles.price}>
-        ${item.price.toFixed(2)} / {item.unit}
-      </Text>
-
-      <Text style={styles.stock}>
-        {item.stock > 0 ? `${item.stock} in stock` : "Out of stock"}
-      </Text>
+      <Pressable
+        onPress={() => addItem(item)}
+        disabled={outOfStock}
+        accessibilityRole="button"
+        accessibilityLabel={`Add ${item.name} to cart`}
+        accessibilityState={{ disabled: outOfStock }}
+        style={({ pressed }) => [
+          commonStyles.primaryButton,
+          outOfStock && commonStyles.disabledButton,
+          pressed && !outOfStock && { opacity: 0.8 },
+        ]}
+      >
+        <Text style={commonStyles.primaryButtonText}>
+          Add
+        </Text>
+      </Pressable>
     </View>
   );
 }
-
-
-const styles = StyleSheet.create({
-  card: {
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: "#fff",
-    marginBottom: 12,
-    elevation: 2, // Android shadow
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  price: {
-    marginTop: 4,
-    fontSize: 14,
-    color: "#444",
-  },
-  stock: {
-    marginTop: 4,
-    fontSize: 12,
-    color: "#666",
-  },
-});
