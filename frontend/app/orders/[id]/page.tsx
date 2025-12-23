@@ -32,7 +32,9 @@ export default function OrderDetailsPage() {
 
     async function fetchOrder() {
       try {
-        const data = await apiRequest(`/orders/${id}`);
+        const data = await apiRequest("/orders");
+        setOrder(Array.isArray(data.orders) ? data.orders : []);
+
         setOrder(data.order);
         setItems(data.items);
       } catch (err) {

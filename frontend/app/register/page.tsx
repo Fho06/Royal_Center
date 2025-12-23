@@ -15,10 +15,10 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      await apiRequest("/register", {
+      await apiRequest("/auth/register", {
         method: "POST",
         body: JSON.stringify({
-          email: email.trim().toLowerCase(), // optional frontend normalize
+          email: email.trim().toLowerCase(),
           password,
         }),
       });
