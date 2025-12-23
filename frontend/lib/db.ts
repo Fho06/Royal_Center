@@ -1,10 +1,14 @@
 import sql from "mssql";
 
+if (!process.env.AZ_DB_SERVER) {
+  throw new Error("AZ_DB_SERVER is not defined");
+}
+
 const config: sql.config = {
   user: process.env.AZ_DB_USER,
   password: process.env.AZ_DB_PASS,
-  server: process.env.AZ_DB_SERVER!,
-  database: process.env.AZ_DB_NAME!,
+  server: process.env.AZ_DB_SERVER,
+  database: process.env.AZ_DB_NAME,
   options: {
     encrypt: true,
     trustServerCertificate: false,
@@ -15,16 +19,18 @@ const config: sql.config = {
     idleTimeoutMillis: 30000,
   },
 };
-if (!process.env.AZ_DB_SERVER) {
-  throw new Error("AZ_DB_SERVER is not defined");
+
+// Global cache (IMPORTANT for Next.js)
+declare global {
+  // eslint-disable-next-line no-var
+  var _sqlPool: sql.ConnectionPool | undefined;
 }
 
-let pool: sql.ConnectionPool | null = null;
-
-export async function getPool() {
-  if (!pool) {
-    pool = await sql.connect(config);
+export async function getPool(): Promise<sql.ConnectionPool> {
+  if (!global._sqlPool) {
+    global._sqlPool = await sql.connect(config);
   }
-  return pool;
+  return global._sqlPool;
 }
-//hi
+
+export { sql };
