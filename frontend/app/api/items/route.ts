@@ -17,8 +17,9 @@ export async function GET() {
       WHERE i.active = 1
       ORDER BY i.name
     `);
+    const items = result.recordset;
 
-    return NextResponse.json({ items: result.recordset });
+    return NextResponse.json({ items, total: result.recordset });
   } catch (err) {
     console.error(err);
     return NextResponse.json(
