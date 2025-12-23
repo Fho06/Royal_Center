@@ -11,10 +11,9 @@ import { useSearchParams, useRouter } from "next/navigation";
 type Item = {
   id: string;
   name: string;
-  price: number;
+  price_usd: number;
   stock: number;
   category_id: number;
-  parent_id: number;
 };
 
 type Category = {
@@ -28,8 +27,8 @@ type Category = {
 
 export default function HomeClient() {
   const router = useRouter();
-  const { cart, setCart } = useCart();
   const searchParams = useSearchParams();
+  const { cart, setCart } = useCart();
 
   /* ---------- STATE ---------- */
   const [items, setItems] = useState<Item[]>([]);
@@ -73,28 +72,23 @@ export default function HomeClient() {
       if (sortOrder !== "none") params.append("sort", sortOrder);
 
       const data = await apiRequest(`/items?${params.toString()}`);
-      setItems(data.items);
-      setTotalItems(data.total);
+
+      setItems(Array.isArray(data.items) ? data.items : []);
+      setTotalItems(Number(data.total) || 0);
     } catch (err: any) {
       setError(err.message);
     }
   }
 
-    async function fetchCategories() {
+  async function fetchCategories() {
     try {
-        const data = await apiRequest("/categories");
-
-        setCategories(
-        Array.isArray(data)
-            ? data
-            : data.categories ?? data.data ?? []
-        );
+      const data = await apiRequest("/categories");
+      setCategories(Array.isArray(data.categories) ? data.categories : []);
     } catch {
-        console.error("Failed to load categories");
-        setCategories([]);
+      console.error("Failed to load categories");
+      setCategories([]);
     }
-    }
-
+  }
 
   /* ---------- URL SYNC ---------- */
 
@@ -149,19 +143,6 @@ export default function HomeClient() {
     fetchCategories();
   }, []);
 
-  /* ---------- DERIVED DATA ---------- */
-
-  const mainCategories = categories.filter(c => c.level === 1);
-
-  const subCategories =
-    selectedCategory === "all"
-      ? []
-      : categories.filter(
-          c => c.level === 2 && c.parent_id === Number(selectedCategory)
-        );
-
-  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-
   /* ---------- CART HELPERS ---------- */
 
   function cartQuantity(itemId: string) {
@@ -192,33 +173,11 @@ export default function HomeClient() {
         {
           item_id: item.id,
           name: item.name,
-          price: item.price,
+          price: item.price_usd,
           quantity: 1,
         },
       ];
     });
-  }
-
-  function increaseQuantity(itemId: string, maxStock: number) {
-    setCart(prev =>
-      prev.map(c =>
-        c.item_id === itemId && c.quantity < maxStock
-          ? { ...c, quantity: c.quantity + 1 }
-          : c
-      )
-    );
-  }
-
-  function decreaseQuantity(itemId: string) {
-    setCart(prev =>
-      prev
-        .map(c =>
-          c.item_id === itemId
-            ? { ...c, quantity: c.quantity - 1 }
-            : c
-        )
-        .filter(c => c.quantity > 0)
-    );
   }
 
   async function placeOrder() {
@@ -259,8 +218,66 @@ export default function HomeClient() {
   return (
     <main className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* PRODUCTS */}
-      {/* (unchanged render code – exactly as you had it) */}
+      <section className="md:col-span-2 space-y-4">
+        {items.length === 0 && (
+          <p className="text-gray-500">No products found.</p>
+        )}
+
+        {items.map(item => (
+          <div
+            key={item.id}
+            className="border rounded p-4 flex justify-between items-center"
+          >
+            <div>
+              <h3 className="font-semibold">{item.name}</h3>
+              <p>${item.price_usd.toFixed(2)}</p>
+              <p className="text-sm text-gray-500">
+                Stock: {remainingStock(item)}
+              </p>
+            </div>
+
+            <button
+              onClick={() => addToCart(item)}
+              disabled={remainingStock(item) <= 0}
+              className="bg-black text-white px-4 py-2 rounded disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
+        ))}
+      </section>
+
       {/* CART */}
+      <aside className="border rounded p-4 space-y-4">
+        <h2 className="font-semibold text-lg">Cart</h2>
+
+        {cart.length === 0 && (
+          <p className="text-gray-500">Cart is empty</p>
+        )}
+
+        {cart.map(item => (
+          <div key={item.item_id} className="flex justify-between text-sm">
+            <span>{item.name}</span>
+            <span>
+              {item.quantity} × ${item.price.toFixed(2)}
+            </span>
+          </div>
+        ))}
+
+        <hr />
+
+        <p className="font-semibold">Total: ${total.toFixed(2)}</p>
+
+        <button
+          onClick={placeOrder}
+          className="w-full bg-black text-white py-2 rounded"
+        >
+          Place Order
+        </button>
+
+        {error && <p className="text-red-600">{error}</p>}
+        {message && <p className="text-green-600">{message}</p>}
+      </aside>
     </main>
   );
 }
