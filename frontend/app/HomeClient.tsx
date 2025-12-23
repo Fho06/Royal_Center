@@ -80,14 +80,21 @@ export default function HomeClient() {
     }
   }
 
-  async function fetchCategories() {
+    async function fetchCategories() {
     try {
-      const data = await apiRequest("/categories");
-      setCategories(data);
+        const data = await apiRequest("/categories");
+
+        setCategories(
+        Array.isArray(data)
+            ? data
+            : data.categories ?? data.data ?? []
+        );
     } catch {
-      console.error("Failed to load categories");
+        console.error("Failed to load categories");
+        setCategories([]);
     }
-  }
+    }
+
 
   /* ---------- URL SYNC ---------- */
 

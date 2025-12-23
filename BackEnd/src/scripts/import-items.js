@@ -1,8 +1,6 @@
 /**
- * ERP → shop_db items sync
- * SAFE for re-runs
- * SAFE for Azure SQL
- * DOES NOT modify ERP
+ * One-time script to import products from SAPROD (ERP)
+ * into shop_db.dbo.items
  */
 
 require("dotenv").config();
@@ -19,27 +17,22 @@ const sourceConfig = {
   database: process.env.SRC_DB_NAME,
   options: {
     encrypt: true,
-    trustServerCertificate: true
-  }
+    trustServerCertificate: true,
+  },
 };
 
 /* =========================
    TARGET DATABASE (AZURE)
    ========================= */
 const targetConfig = {
+  server: process.env.AZ_DB_SERVER,   // xxx.database.windows.net
   user: process.env.AZ_DB_USER,
   password: process.env.AZ_DB_PASS,
-  server: process.env.AZ_DB_SERVER, // xxx.database.windows.net
-  database: process.env.AZ_DB_NAME, // shop_db
+  database: process.env.AZ_DB_NAME,   // shop_db
   options: {
     encrypt: true,
-    trustServerCertificate: false
+    trustServerCertificate: false,
   },
-  pool: {
-    max: 5,
-    min: 0,
-    idleTimeoutMillis: 30000
-  }
 };
 
 async function importItems() {
@@ -47,64 +40,88 @@ async function importItems() {
   let targetPool;
 
   try {
-    console.log("🔌 Connecting to ERP (SOURCE) database...");
+    console.log("🔌 Connecting to ERP...");
     sourcePool = await new sql.ConnectionPool(sourceConfig).connect();
 
     console.log("📦 Fetching products from SAPROD...");
-    const sourceResult = await sourcePool.request().query(`
+    const { recordset: products } = await sourcePool.query(`
       SELECT
-        CodProd,
-        Descrip,
-        Precio2,
-        Existen
-      FROM SAPROD
+        CodProd  AS product_id,
+        Descrip  AS name,
+        Precio2  AS price_usd,
+        Existen  AS stock,
+        CodInst  AS category_id
+      FROM dbo.SAPROD
     `);
 
-    console.log(`✅ Found ${sourceResult.recordset.length} products`);
+    console.log(`✅ Found ${products.length} products`);
 
-    console.log("🔌 Connecting to Azure (TARGET) database...");
+    console.log("🔌 Connecting to Azure SQL...");
     targetPool = await new sql.ConnectionPool(targetConfig).connect();
 
     let imported = 0;
     let skipped = 0;
 
-    for (const row of sourceResult.recordset) {
-      const productId = String(row.CodProd).trim(); // preserve leading zeros
-      const name = row.Descrip?.trim();
-      const priceUSD = Number(row.Precio2);
-      const stock = row.Existen > 0 ? row.Existen : 0;
+    for (const row of products) {
+      const id = String(row.product_id).trim();
+      const name = row.name?.trim();
+      const categoryId = parseInt(row.category_id, 10);
+      const priceUSD = Number(row.price_usd) || 0;
+      const stock = Math.max(0, Number(row.stock || 0));
 
-      // Basic validation
-      if (!productId || !name || isNaN(priceUSD) || priceUSD <= 0) {
+      if (!id || !name || !Number.isInteger(categoryId)) {
         skipped++;
         continue;
       }
 
       await targetPool
         .request()
-        .input("id", sql.VarChar(50), productId)
+        .input("id", sql.VarChar(50), id)
         .input("name", sql.NVarChar(255), name)
-        .input("category_id", sql.Int, 1) // TEMP category (fixed later by category sync)
+        .input("category_id", sql.Int, categoryId)
         .input("price_usd", sql.Decimal(18, 2), priceUSD)
         .input("stock", sql.Int, stock)
         .input("unit", sql.NVarChar(50), "UN")
         .input("active", sql.Bit, 1)
         .query(`
-          IF NOT EXISTS (SELECT 1 FROM dbo.items WHERE id = @id)
-          BEGIN
-            INSERT INTO dbo.items
-              (id, name, category_id, price_usd, stock, unit, active)
-            VALUES
-              (@id, @name, @category_id, @price_usd, @stock, @unit, @active)
-          END
+          MERGE dbo.items AS t
+          USING (SELECT @id AS id) s
+          ON t.id = s.id
+          WHEN MATCHED THEN
+            UPDATE SET
+              name = @name,
+              category_id = @category_id,
+              price_usd = @price_usd,
+              stock = @stock,
+              unit = @unit,
+              active = @active
+          WHEN NOT MATCHED THEN
+            INSERT (
+              id,
+              name,
+              category_id,
+              price_usd,
+              stock,
+              unit,
+              active
+            )
+            VALUES (
+              @id,
+              @name,
+              @category_id,
+              @price_usd,
+              @stock,
+              @unit,
+              @active
+            );
         `);
 
       imported++;
     }
 
     console.log("🎉 Import finished");
-    console.log(`📥 Imported: ${imported}`);
-    console.log(`⏭️ Skipped: ${skipped}`);
+    console.log(`📥 Imported / Updated: ${imported}`);
+    console.log(`⏭️ Skipped (invalid): ${skipped}`);
 
   } catch (err) {
     console.error("❌ Import failed:");
@@ -112,6 +129,7 @@ async function importItems() {
   } finally {
     if (sourcePool) await sourcePool.close();
     if (targetPool) await targetPool.close();
+    process.exit(0);
   }
 }
 
