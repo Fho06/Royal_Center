@@ -16,14 +16,13 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const data = await apiRequest("/login", {
+      const data = await apiRequest("/auth/login", {
         method: "POST",
         body: JSON.stringify({
-          email: email.trim().toLowerCase(), // optional frontend normalize
+          email: email.trim().toLowerCase(),
           password,
         }),
       });
-
       saveToken(data.token);
       router.push("/");
     } catch (err: any) {
