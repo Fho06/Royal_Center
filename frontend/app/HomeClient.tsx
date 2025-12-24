@@ -45,15 +45,16 @@ export default function HomeClient() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSubcategory, setSelectedSubcategory] = useState("all");
 
+  // 🔹 PRICE FILTERS
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+
   /* ---------- PAGINATION ---------- */
   const ITEMS_PER_PAGE = 20;
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(totalItems / ITEMS_PER_PAGE)
-  );
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
   /* ---------- HYDRATION ---------- */
 
@@ -68,6 +69,8 @@ export default function HomeClient() {
     setInStockOnly(searchParams.get("in_stock") === "1");
     setSelectedCategory(searchParams.get("category") || "all");
     setSelectedSubcategory(searchParams.get("subcategory") || "all");
+    setMinPrice(searchParams.get("min_price") || "");
+    setMaxPrice(searchParams.get("max_price") || "");
     setCurrentPage(Number(searchParams.get("page")) || 1);
   }, [hydrated, searchParams]);
 
@@ -82,10 +85,14 @@ export default function HomeClient() {
 
       if (search) params.append("search", search);
       if (inStockOnly) params.append("in_stock", "1");
-      if (selectedSubcategory !== "all")
+      if (minPrice) params.append("min_price", minPrice);
+      if (maxPrice) params.append("max_price", maxPrice);
+
+      if (selectedSubcategory !== "all") {
         params.append("subcategory_id", selectedSubcategory);
-      else if (selectedCategory !== "all")
+      } else if (selectedCategory !== "all") {
         params.append("category_id", selectedCategory);
+      }
 
       const data = await apiRequest(`/items?${params.toString()}`);
 
@@ -112,16 +119,18 @@ export default function HomeClient() {
 
     const url = new URL(window.location.href);
 
-    function setParam(key: string, value: string | null) {
-      if (!value || value === "all") url.searchParams.delete(key);
-      else url.searchParams.set(key, value);
-    }
+    const set = (k: string, v: string | null) => {
+      if (!v || v === "all") url.searchParams.delete(k);
+      else url.searchParams.set(k, v);
+    };
 
-    setParam("search", search);
-    setParam("category", selectedCategory);
-    setParam("subcategory", selectedSubcategory);
-    setParam("in_stock", inStockOnly ? "1" : null);
-    setParam("page", currentPage.toString());
+    set("search", search);
+    set("category", selectedCategory);
+    set("subcategory", selectedSubcategory);
+    set("in_stock", inStockOnly ? "1" : null);
+    set("min_price", minPrice);
+    set("max_price", maxPrice);
+    set("page", currentPage.toString());
 
     router.replace(url.pathname + "?" + url.searchParams.toString(), {
       scroll: false,
@@ -132,8 +141,12 @@ export default function HomeClient() {
     selectedCategory,
     selectedSubcategory,
     inStockOnly,
+    minPrice,
+    maxPrice,
     currentPage,
   ]);
+
+  /* ---------- EFFECTS ---------- */
 
   useEffect(() => {
     if (!hydrated) return;
@@ -144,6 +157,8 @@ export default function HomeClient() {
     selectedCategory,
     selectedSubcategory,
     inStockOnly,
+    minPrice,
+    maxPrice,
     currentPage,
   ]);
 
@@ -151,10 +166,19 @@ export default function HomeClient() {
     fetchCategories();
   }, []);
 
+  // reset page when filters change
   useEffect(() => {
     if (!hydrated) return;
     setCurrentPage(1);
-  }, [hydrated, search, selectedCategory, selectedSubcategory, inStockOnly]);
+  }, [
+    hydrated,
+    search,
+    selectedCategory,
+    selectedSubcategory,
+    inStockOnly,
+    minPrice,
+    maxPrice,
+  ]);
 
   /* ---------- DERIVED ---------- */
 
@@ -239,60 +263,107 @@ export default function HomeClient() {
   return (
     <main className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
 
-      {/* FILTER BAR */}
-        <section className="md:col-span-2 space-y-3">
-        {/* SEARCH */}
-        <input
+      {/* FILTER + CART ROW */}
+      <section className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        {/* FILTERS */}
+        <div className="md:col-span-2 space-y-3">
+          <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search products…"
             className="w-full rounded border px-4 py-2"
-        />
+          />
 
-        {/* CATEGORY ROW */}
-        <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3">
+            <input
+              type="number"
+              placeholder="Min $"
+              value={minPrice}
+              onChange={e => setMinPrice(e.target.value)}
+              className="w-24 rounded border px-3 py-2"
+            />
+
+            <input
+              type="number"
+              placeholder="Max $"
+              value={maxPrice}
+              onChange={e => setMaxPrice(e.target.value)}
+              className="w-24 rounded border px-3 py-2"
+            />
+
             <select
-            value={selectedCategory}
-            onChange={e => {
+              value={selectedCategory}
+              onChange={e => {
                 setSelectedCategory(e.target.value);
                 setSelectedSubcategory("all");
-            }}
-            className="rounded border px-3 py-2"
+              }}
+              className="rounded border px-3 py-2"
             >
-            <option value="all">All categories</option>
-            {mainCategories.map(c => (
+              <option value="all">All categories</option>
+              {mainCategories.map(c => (
                 <option key={c.id} value={c.id}>
-                {c.name}
+                  {c.name}
                 </option>
-            ))}
+              ))}
             </select>
 
             {subCategories.length > 0 && (
-            <select
+              <select
                 value={selectedSubcategory}
                 onChange={e => setSelectedSubcategory(e.target.value)}
                 className="rounded border px-3 py-2"
-            >
+              >
                 <option value="all">All subcategories</option>
                 {subCategories.map(c => (
-                <option key={c.id} value={c.id}>
+                  <option key={c.id} value={c.id}>
                     {c.name}
-                </option>
+                  </option>
                 ))}
-            </select>
+              </select>
             )}
-        </div>
+          </div>
 
-        {/* IN STOCK */}
-        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 text-sm">
             <input
-            type="checkbox"
-            checked={inStockOnly}
-            onChange={e => setInStockOnly(e.target.checked)}
+              type="checkbox"
+              checked={inStockOnly}
+              onChange={e => setInStockOnly(e.target.checked)}
             />
             In stock only
-        </label>
-        </section>
+          </label>
+        </div>
+
+        {/* CART */}
+        <aside className="border rounded p-4">
+          <h2 className="text-xl font-semibold mb-2">Cart</h2>
+
+          {cart.length === 0 && (
+            <p className="text-gray-500 text-sm">Cart is empty</p>
+          )}
+
+          {cart.map(item => (
+            <div key={item.item_id} className="flex justify-between mb-2">
+              <span>{item.name}</span>
+              <span>{item.quantity}</span>
+            </div>
+          ))}
+
+          <p className="font-bold mt-3">
+            Total: ${total.toFixed(2)}
+          </p>
+
+          <button
+            onClick={placeOrder}
+            className="mt-3 w-full bg-black text-white py-2 rounded"
+          >
+            Place Order
+          </button>
+
+          {error && <p className="text-red-600 mt-2">{error}</p>}
+          {message && <p className="text-green-600 mt-2">{message}</p>}
+        </aside>
+      </section>
 
       {/* PRODUCTS */}
       <section className="md:col-span-2 space-y-4">
@@ -339,30 +410,6 @@ export default function HomeClient() {
           </div>
         )}
       </section>
-
-      {/* CART */}
-      <aside className="border rounded p-4">
-        <h2 className="text-xl font-semibold mb-2">Cart</h2>
-
-        {cart.map(item => (
-          <div key={item.item_id} className="flex justify-between mb-2">
-            <span>{item.name}</span>
-            <span>{item.quantity}</span>
-          </div>
-        ))}
-
-        <p className="font-bold mt-3">Total: ${total.toFixed(2)}</p>
-
-        <button
-          onClick={placeOrder}
-          className="mt-3 w-full bg-black text-white py-2 rounded"
-        >
-          Place Order
-        </button>
-
-        {error && <p className="text-red-600">{error}</p>}
-        {message && <p className="text-green-600">{message}</p>}
-      </aside>
     </main>
   );
 }

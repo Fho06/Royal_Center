@@ -1,46 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { isLoggedIn, logout } from "@/lib/auth";
+import { useAuth } from "@/app/context/AuthContext";
 
 export default function Navbar() {
-  const router = useRouter();
-  const loggedIn = isLoggedIn();
-
-  function handleLogout() {
-    logout();
-    router.push("/login");
-  }
+  const { isAuthenticated, logout } = useAuth();
 
   return (
-    <nav className="flex items-center justify-between border-b px-6 py-4">
-      <Link href="/" className="text-lg font-bold">
-        RoyalCenter
+    <nav className="flex items-center justify-between border-b p-4">
+      <Link href="/" className="font-bold">
+        Royal Center
       </Link>
 
-      <div className="flex gap-4 items-center">
-        {loggedIn ? (
+      <div className="flex gap-4">
+        {isAuthenticated ? (
           <>
-            <Link href="/orders" className="hover:underline">
-              Orders
-            </Link>
-
+            <Link href="/orders">Orders</Link>
             <button
-              onClick={handleLogout}
-              className="rounded border px-3 py-1"
+              onClick={logout}
+              className="text-sm underline"
             >
               Logout
             </button>
           </>
         ) : (
           <>
-            <Link href="/login" className="hover:underline">
-              Login
-            </Link>
-            <Link href="/register" className="hover:underline">
-              Register
-            </Link>
+            <Link href="/login">Login</Link>
+            <Link href="/register">Register</Link>
           </>
         )}
       </div>
