@@ -1,50 +1,47 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { logout, getToken } from "@/lib/auth";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { isLoggedIn, logout } from "@/lib/auth";
 
 export default function Navbar() {
-  const [loggedIn, setLoggedIn] = useState(false);
   const router = useRouter();
-  const pathname = usePathname();
-
-  // Re-check auth whenever the route changes
-  useEffect(() => {
-    setLoggedIn(!!getToken());
-  }, [pathname]);
+  const loggedIn = isLoggedIn();
 
   function handleLogout() {
     logout();
-    setLoggedIn(false);
     router.push("/login");
   }
 
   return (
     <nav className="flex items-center justify-between border-b px-6 py-4">
-      <Link href="/" className="text-xl font-bold">
-        Royal Center
+      <Link href="/" className="text-lg font-bold">
+        RoyalCenter
       </Link>
 
-      <div className="flex items-center gap-6">
-        {loggedIn && (
-          <Link href="/orders" className="hover:underline">
-            Orders
-          </Link>
-        )}
-
+      <div className="flex gap-4 items-center">
         {loggedIn ? (
-          <button
-            onClick={handleLogout}
-            className="rounded bg-black px-3 py-1 text-white"
-          >
-            Logout
-          </button>
+          <>
+            <Link href="/orders" className="hover:underline">
+              Orders
+            </Link>
+
+            <button
+              onClick={handleLogout}
+              className="rounded border px-3 py-1"
+            >
+              Logout
+            </button>
+          </>
         ) : (
-          <Link href="/login" className="hover:underline">
-            Login
-          </Link>
+          <>
+            <Link href="/login" className="hover:underline">
+              Login
+            </Link>
+            <Link href="/register" className="hover:underline">
+              Register
+            </Link>
+          </>
         )}
       </div>
     </nav>

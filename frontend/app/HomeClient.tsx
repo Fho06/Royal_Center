@@ -54,6 +54,11 @@ export default function HomeClient() {
     useState(Number(searchParams.get("page")) || 1);
   const [totalItems, setTotalItems] = useState(0);
 
+  const totalPages = Math.max(
+    1,
+    Math.ceil(totalItems / ITEMS_PER_PAGE)
+  );
+
   /* ---------- DATA FETCH ---------- */
 
   async function fetchItems() {
@@ -85,7 +90,6 @@ export default function HomeClient() {
       const data = await apiRequest("/categories");
       setCategories(Array.isArray(data.categories) ? data.categories : []);
     } catch {
-      console.error("Failed to load categories");
       setCategories([]);
     }
   }
@@ -143,6 +147,11 @@ export default function HomeClient() {
     fetchCategories();
   }, []);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, sortOrder, inStockOnly, selectedCategory, selectedSubcategory]);
+
   /* ---------- CART HELPERS ---------- */
 
   function cartQuantity(itemId: string) {
@@ -178,6 +187,28 @@ export default function HomeClient() {
         },
       ];
     });
+  }
+
+  function increaseQuantity(itemId: string, maxStock: number) {
+    setCart(prev =>
+      prev.map(item =>
+        item.item_id === itemId && item.quantity < maxStock
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      )
+    );
+  }
+
+  function decreaseQuantity(itemId: string) {
+    setCart(prev =>
+      prev
+        .map(item =>
+          item.item_id === itemId
+            ? { ...item, quantity: item.quantity - 1 }
+            : item
+        )
+        .filter(item => item.quantity > 0)
+    );
   }
 
   async function placeOrder() {
@@ -245,38 +276,99 @@ export default function HomeClient() {
             </button>
           </div>
         ))}
+
+        {/* PAGINATION */}
+        {totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-center gap-4">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => p - 1)}
+              className="rounded border px-3 py-1 disabled:opacity-50"
+            >
+              Previous
+            </button>
+
+            <span className="text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </span>
+
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(p => p + 1)}
+              className="rounded border px-3 py-1 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </section>
 
       {/* CART */}
-      <aside className="border rounded p-4 space-y-4">
-        <h2 className="font-semibold text-lg">Cart</h2>
+      <aside>
+        <div className="rounded border p-4">
+          <h2 className="mb-2 text-xl font-semibold">Cart</h2>
 
-        {cart.length === 0 && (
-          <p className="text-gray-500">Cart is empty</p>
-        )}
+          {cart.length === 0 && (
+            <p className="text-gray-500">Cart is empty</p>
+          )}
 
-        {cart.map(item => (
-          <div key={item.item_id} className="flex justify-between text-sm">
-            <span>{item.name}</span>
-            <span>
-              {item.quantity} × ${item.price.toFixed(2)}
-            </span>
-          </div>
-        ))}
+          {cart.map(item => (
+            <div
+              key={item.item_id}
+              className="mb-3 flex items-center justify-between"
+            >
+              <div>
+                <p className="font-medium">{item.name}</p>
+                <p className="text-sm text-gray-500">
+                  ${(item.price * item.quantity).toFixed(2)}
+                </p>
+              </div>
 
-        <hr />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => decreaseQuantity(item.item_id)}
+                  className="h-8 w-8 rounded border"
+                >
+                  −
+                </button>
 
-        <p className="font-semibold">Total: ${total.toFixed(2)}</p>
+                <span>{item.quantity}</span>
 
-        <button
-          onClick={placeOrder}
-          className="w-full bg-black text-white py-2 rounded"
-        >
-          Place Order
-        </button>
+                <button
+                  onClick={() =>
+                    increaseQuantity(
+                      item.item_id,
+                      items.find(i => i.id === item.item_id)?.stock || 0
+                    )
+                  }
+                  className="h-8 w-8 rounded border"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          ))}
 
-        {error && <p className="text-red-600">{error}</p>}
-        {message && <p className="text-green-600">{message}</p>}
+          {cart.length > 0 && (
+            <>
+              <div className="mt-4 border-t pt-3 text-right">
+                <p className="font-bold">
+                  Total: ${total.toFixed(2)}
+                </p>
+              </div>
+
+              <button
+                onClick={placeOrder}
+                className="mt-4 w-full rounded bg-black py-2 text-white"
+              >
+                Place Order
+              </button>
+            </>
+          )}
+
+          {error && <p className="mt-2 text-red-600">{error}</p>}
+          {message && <p className="mt-2 text-green-600">{message}</p>}
+        </div>
       </aside>
     </main>
   );
