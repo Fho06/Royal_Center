@@ -4,12 +4,14 @@ import { useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { saveToken } from "@/lib/auth";
 import { useRouter } from "next/navigation";
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const { login } = useAuth();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,7 +25,7 @@ export default function LoginPage() {
           password,
         }),
       });
-      saveToken(data.token);
+      login(data.token);
       router.push("/");
     } catch (err: any) {
       setError(err.message);

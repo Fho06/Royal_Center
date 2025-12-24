@@ -28,6 +28,8 @@ app.use("/api", itemRoutes);
 const categoryRoutes = require("./routes/categories.routes");
 app.use("/api", categoryRoutes);
 
+const orderRoutes = require("./routes/orders.routes");
+app.use("/api", orderRoutes);
 
 // Get port from env or default to 4000
 const PORT = process.env.PORT || 4000;
