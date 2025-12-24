@@ -36,28 +36,40 @@ export default function HomeClient() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const [search, setSearch] = useState(searchParams.get("search") || "");
-  const [sortOrder, setSortOrder] = useState<"none" | "asc" | "desc">(
-    (searchParams.get("sort") as any) || "none"
-  );
-  const [inStockOnly, setInStockOnly] =
-    useState(searchParams.get("in_stock") === "1");
+  // hydration guard
+  const [hydrated, setHydrated] = useState(false);
 
-  const [selectedCategory, setSelectedCategory] =
-    useState(searchParams.get("category") || "all");
-  const [selectedSubcategory, setSelectedSubcategory] =
-    useState(searchParams.get("subcategory") || "all");
+  // filters
+  const [search, setSearch] = useState("");
+  const [inStockOnly, setInStockOnly] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("all");
 
   /* ---------- PAGINATION ---------- */
   const ITEMS_PER_PAGE = 20;
-  const [currentPage, setCurrentPage] =
-    useState(Number(searchParams.get("page")) || 1);
+  const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
   const totalPages = Math.max(
     1,
     Math.ceil(totalItems / ITEMS_PER_PAGE)
   );
+
+  /* ---------- HYDRATION ---------- */
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
+    setSearch(searchParams.get("search") || "");
+    setInStockOnly(searchParams.get("in_stock") === "1");
+    setSelectedCategory(searchParams.get("category") || "all");
+    setSelectedSubcategory(searchParams.get("subcategory") || "all");
+    setCurrentPage(Number(searchParams.get("page")) || 1);
+  }, [hydrated, searchParams]);
 
   /* ---------- DATA FETCH ---------- */
 
@@ -70,11 +82,10 @@ export default function HomeClient() {
 
       if (search) params.append("search", search);
       if (inStockOnly) params.append("in_stock", "1");
-      if (selectedCategory !== "all")
-        params.append("category_id", selectedCategory);
       if (selectedSubcategory !== "all")
         params.append("subcategory_id", selectedSubcategory);
-      if (sortOrder !== "none") params.append("sort", sortOrder);
+      else if (selectedCategory !== "all")
+        params.append("category_id", selectedCategory);
 
       const data = await apiRequest(`/items?${params.toString()}`);
 
@@ -96,50 +107,43 @@ export default function HomeClient() {
 
   /* ---------- URL SYNC ---------- */
 
-  function syncUrl(params: Record<string, string | null>) {
+  useEffect(() => {
+    if (!hydrated) return;
+
     const url = new URL(window.location.href);
 
-    Object.entries(params).forEach(([key, value]) => {
-      if (!value || value === "all" || value === "none") {
-        url.searchParams.delete(key);
-      } else {
-        url.searchParams.set(key, value);
-      }
-    });
+    function setParam(key: string, value: string | null) {
+      if (!value || value === "all") url.searchParams.delete(key);
+      else url.searchParams.set(key, value);
+    }
+
+    setParam("search", search);
+    setParam("category", selectedCategory);
+    setParam("subcategory", selectedSubcategory);
+    setParam("in_stock", inStockOnly ? "1" : null);
+    setParam("page", currentPage.toString());
 
     router.replace(url.pathname + "?" + url.searchParams.toString(), {
       scroll: false,
     });
-  }
-
-  /* ---------- EFFECTS ---------- */
-
-  useEffect(() => {
-    syncUrl({
-      search,
-      sort: sortOrder,
-      in_stock: inStockOnly ? "1" : null,
-      category: selectedCategory,
-      subcategory: selectedSubcategory,
-      page: currentPage.toString(),
-    });
   }, [
+    hydrated,
     search,
-    sortOrder,
-    inStockOnly,
     selectedCategory,
     selectedSubcategory,
+    inStockOnly,
     currentPage,
   ]);
 
   useEffect(() => {
+    if (!hydrated) return;
     fetchItems();
   }, [
+    hydrated,
     search,
-    sortOrder,
-    inStockOnly,
     selectedCategory,
     selectedSubcategory,
+    inStockOnly,
     currentPage,
   ]);
 
@@ -147,12 +151,22 @@ export default function HomeClient() {
     fetchCategories();
   }, []);
 
-  // Reset page when filters change
   useEffect(() => {
+    if (!hydrated) return;
     setCurrentPage(1);
-  }, [search, sortOrder, inStockOnly, selectedCategory, selectedSubcategory]);
+  }, [hydrated, search, selectedCategory, selectedSubcategory, inStockOnly]);
 
-  /* ---------- CART HELPERS ---------- */
+  /* ---------- DERIVED ---------- */
+
+  const mainCategories = categories.filter(c => c.level === 1);
+  const subCategories =
+    selectedCategory === "all"
+      ? []
+      : categories.filter(
+          c => c.level === 2 && c.parent_id === Number(selectedCategory)
+        );
+
+  /* ---------- CART ---------- */
 
   function cartQuantity(itemId: string) {
     return cart.find(c => c.item_id === itemId)?.quantity || 0;
@@ -163,19 +177,17 @@ export default function HomeClient() {
   }
 
   function addToCart(item: Item) {
+    if (remainingStock(item) <= 0) return;
+
     setCart(prev => {
       const existing = prev.find(c => c.item_id === item.id);
-
       if (existing) {
-        if (existing.quantity >= item.stock) return prev;
         return prev.map(c =>
           c.item_id === item.id
             ? { ...c, quantity: c.quantity + 1 }
             : c
         );
       }
-
-      if (item.stock === 0) return prev;
 
       return [
         ...prev,
@@ -187,28 +199,6 @@ export default function HomeClient() {
         },
       ];
     });
-  }
-
-  function increaseQuantity(itemId: string, maxStock: number) {
-    setCart(prev =>
-      prev.map(item =>
-        item.item_id === itemId && item.quantity < maxStock
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      )
-    );
-  }
-
-  function decreaseQuantity(itemId: string) {
-    setCart(prev =>
-      prev
-        .map(item =>
-          item.item_id === itemId
-            ? { ...item, quantity: item.quantity - 1 }
-            : item
-        )
-        .filter(item => item.quantity > 0)
-    );
   }
 
   async function placeOrder() {
@@ -232,7 +222,7 @@ export default function HomeClient() {
       });
 
       setCart([]);
-      await fetchItems();
+      fetchItems();
       setMessage("Order placed successfully!");
     } catch (err: any) {
       setError(err.message);
@@ -248,16 +238,68 @@ export default function HomeClient() {
 
   return (
     <main className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+
+      {/* FILTER BAR */}
+        <section className="md:col-span-2 space-y-3">
+        {/* SEARCH */}
+        <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search products…"
+            className="w-full rounded border px-4 py-2"
+        />
+
+        {/* CATEGORY ROW */}
+        <div className="flex flex-wrap gap-3">
+            <select
+            value={selectedCategory}
+            onChange={e => {
+                setSelectedCategory(e.target.value);
+                setSelectedSubcategory("all");
+            }}
+            className="rounded border px-3 py-2"
+            >
+            <option value="all">All categories</option>
+            {mainCategories.map(c => (
+                <option key={c.id} value={c.id}>
+                {c.name}
+                </option>
+            ))}
+            </select>
+
+            {subCategories.length > 0 && (
+            <select
+                value={selectedSubcategory}
+                onChange={e => setSelectedSubcategory(e.target.value)}
+                className="rounded border px-3 py-2"
+            >
+                <option value="all">All subcategories</option>
+                {subCategories.map(c => (
+                <option key={c.id} value={c.id}>
+                    {c.name}
+                </option>
+                ))}
+            </select>
+            )}
+        </div>
+
+        {/* IN STOCK */}
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+            type="checkbox"
+            checked={inStockOnly}
+            onChange={e => setInStockOnly(e.target.checked)}
+            />
+            In stock only
+        </label>
+        </section>
+
       {/* PRODUCTS */}
       <section className="md:col-span-2 space-y-4">
-        {items.length === 0 && (
-          <p className="text-gray-500">No products found.</p>
-        )}
-
         {items.map(item => (
           <div
             key={item.id}
-            className="border rounded p-4 flex justify-between items-center"
+            className="border rounded p-4 flex justify-between"
           >
             <div>
               <h3 className="font-semibold">{item.name}</h3>
@@ -277,25 +319,20 @@ export default function HomeClient() {
           </div>
         ))}
 
-        {/* PAGINATION */}
         {totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-center gap-4">
+          <div className="flex justify-center gap-4">
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(p => p - 1)}
-              className="rounded border px-3 py-1 disabled:opacity-50"
             >
               Previous
             </button>
-
-            <span className="text-sm text-gray-600">
+            <span>
               Page {currentPage} of {totalPages}
             </span>
-
             <button
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage(p => p + 1)}
-              className="rounded border px-3 py-1 disabled:opacity-50"
             >
               Next
             </button>
@@ -304,71 +341,27 @@ export default function HomeClient() {
       </section>
 
       {/* CART */}
-      <aside>
-        <div className="rounded border p-4">
-          <h2 className="mb-2 text-xl font-semibold">Cart</h2>
+      <aside className="border rounded p-4">
+        <h2 className="text-xl font-semibold mb-2">Cart</h2>
 
-          {cart.length === 0 && (
-            <p className="text-gray-500">Cart is empty</p>
-          )}
+        {cart.map(item => (
+          <div key={item.item_id} className="flex justify-between mb-2">
+            <span>{item.name}</span>
+            <span>{item.quantity}</span>
+          </div>
+        ))}
 
-          {cart.map(item => (
-            <div
-              key={item.item_id}
-              className="mb-3 flex items-center justify-between"
-            >
-              <div>
-                <p className="font-medium">{item.name}</p>
-                <p className="text-sm text-gray-500">
-                  ${(item.price * item.quantity).toFixed(2)}
-                </p>
-              </div>
+        <p className="font-bold mt-3">Total: ${total.toFixed(2)}</p>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => decreaseQuantity(item.item_id)}
-                  className="h-8 w-8 rounded border"
-                >
-                  −
-                </button>
+        <button
+          onClick={placeOrder}
+          className="mt-3 w-full bg-black text-white py-2 rounded"
+        >
+          Place Order
+        </button>
 
-                <span>{item.quantity}</span>
-
-                <button
-                  onClick={() =>
-                    increaseQuantity(
-                      item.item_id,
-                      items.find(i => i.id === item.item_id)?.stock || 0
-                    )
-                  }
-                  className="h-8 w-8 rounded border"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {cart.length > 0 && (
-            <>
-              <div className="mt-4 border-t pt-3 text-right">
-                <p className="font-bold">
-                  Total: ${total.toFixed(2)}
-                </p>
-              </div>
-
-              <button
-                onClick={placeOrder}
-                className="mt-4 w-full rounded bg-black py-2 text-white"
-              >
-                Place Order
-              </button>
-            </>
-          )}
-
-          {error && <p className="mt-2 text-red-600">{error}</p>}
-          {message && <p className="mt-2 text-green-600">{message}</p>}
-        </div>
+        {error && <p className="text-red-600">{error}</p>}
+        {message && <p className="text-green-600">{message}</p>}
       </aside>
     </main>
   );
