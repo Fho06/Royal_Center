@@ -89,16 +89,15 @@ export async function POST(req: Request) {
         total += dbItem.price_usd * item.quantity;
       }
 
-      const orderRes = await tx
+        const orderRes = await tx
         .request()
         .input("user_id", sql.Int, user.userId)
         .input("total", sql.Decimal(10, 2), total)
         .query(`
-          INSERT INTO orders (user_id, total_amount)
-          OUTPUT INSERTED.id
-          VALUES (@user_id, @total)
+            INSERT INTO orders (user_id, total_amount, status)
+            OUTPUT INSERTED.id
+            VALUES (@user_id, @total, 'pending_payment')
         `);
-
       const orderId = orderRes.recordset[0].id;
 
       for (const item of items) {
@@ -129,8 +128,8 @@ export async function POST(req: Request) {
           `);
       }
 
-      await tx.commit();
-      return NextResponse.json({ message: "Order placed successfully" });
+    await tx.commit();
+    return NextResponse.json({ orderId });
     } catch (err) {
       await tx.rollback();
       throw err;
