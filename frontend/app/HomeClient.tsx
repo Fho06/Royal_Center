@@ -225,38 +225,53 @@ export default function HomeClient() {
     });
   }
 
-  async function placeOrder() {
+    async function placeOrder() {
     setError("");
     setMessage("");
 
     if (!isLoggedIn()) {
-      router.push("/login");
-      return;
+        router.push("/login");
+        return;
+    }
+
+    if (cart.length === 0) {
+        setError("Cart is empty");
+        return;
     }
 
     try {
-      await apiRequest("/orders", {
+        const data = await apiRequest("/orders", {
         method: "POST",
         body: JSON.stringify({
-          items: cart.map(c => ({
+            items: cart.map(c => ({
             item_id: c.item_id,
             quantity: c.quantity,
-          })),
+            })),
         }),
-      });
+        });
 
-      setCart([]);
-      fetchItems();
-      setMessage("Order placed successfully!");
+        // EXPECT backend to return { orderId }
+        const orderId = data.orderId ?? data.id;
+
+        if (!orderId) {
+        throw new Error("Order ID missing from response");
+        }
+
+        // Clear cart AFTER order is created
+        setCart([]);
+
+        // Redirect to payment page
+        router.push(`/checkout/pay/${orderId}`);
     } catch (err: any) {
-      setError(err.message);
+        setError(err.message || "Failed to place order");
     }
-  }
+}
 
-  const total = cart.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+
+    const total = cart.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+    );
 
   /* ---------- RENDER ---------- */
 
