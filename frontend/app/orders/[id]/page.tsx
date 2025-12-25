@@ -14,12 +14,14 @@ type OrderItem = {
 type Order = {
   id: number;
   total_amount: number;
+  status: string;
   created_at: string;
 };
 
 export default function OrderDetailsPage() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const router = useRouter();
+
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,9 +34,7 @@ export default function OrderDetailsPage() {
 
     async function fetchOrder() {
       try {
-        const data = await apiRequest("/orders");
-        setOrder(Array.isArray(data.orders) ? data.orders : []);
-
+        const data = await apiRequest(`/orders/${id}`);
         setOrder(data.order);
         setItems(data.items);
       } catch (err) {
@@ -45,7 +45,7 @@ export default function OrderDetailsPage() {
     }
 
     fetchOrder();
-  }, [id]);
+  }, [id, router]);
 
   if (loading) {
     return <p className="p-6">Loading order...</p>;
@@ -56,15 +56,54 @@ export default function OrderDetailsPage() {
   }
 
   return (
-    <div className="p-6">
-      <h1 className="mb-2 text-2xl font-bold">
+    <div className="p-6 max-w-2xl mx-auto">
+      <h1 className="mb-1 text-2xl font-bold">
         Order #{order.id}
       </h1>
 
-      <p className="mb-6 text-sm text-gray-500">
+      <p className="mb-2 text-sm text-gray-500">
         {new Date(order.created_at).toLocaleString()}
       </p>
 
+      <p className="mb-6 text-sm">
+        Status:{" "}
+        <span className="font-semibold">
+          {order.status.replace("_", " ")}
+        </span>
+      </p>
+
+      {/* PAYMENT CTA */}
+      {order.status === "pending_payment" && (
+        <div className="mb-6 rounded border border-yellow-400 bg-yellow-50 p-4">
+          <p className="mb-3 font-medium">
+            Payment required to complete this order.
+          </p>
+          <button
+            onClick={() => router.push(`/checkout/pay/${order.id}`)}
+            className="bg-black text-white px-4 py-2 rounded"
+          >
+            Complete Payment
+          </button>
+        </div>
+      )}
+
+      {order.status === "under_review" && (
+        <div className="mb-6 rounded border border-blue-400 bg-blue-50 p-4">
+          <p className="font-medium">
+            Payment submitted — awaiting verification.
+          </p>
+        </div>
+      )}
+
+      {order.status === "paid" && (
+        <div className="mb-6 rounded border border-green-400 bg-green-50 p-4">
+          <p className="font-medium">
+            Payment confirmed. Order is being prepared.
+          </p>
+        </div>
+      )}
+
+      {/* ITEMS */}
       <div className="space-y-3">
         {items.map((item, index) => (
           <div

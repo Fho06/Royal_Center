@@ -1,86 +1,102 @@
 import { NextResponse } from "next/server";
 import { getPool, sql } from "@/lib/db";
 
-export const runtime = "nodejs";
-
 export async function GET(req: Request) {
   try {
-    const pool = await getPool();
     const { searchParams } = new URL(req.url);
 
-    // ---------- pagination ----------
-    const limit = Math.min(
-      Math.max(Number(searchParams.get("limit")) || 20, 1),
-      100
-    );
-    const offset = Math.max(Number(searchParams.get("offset")) || 0, 0);
+    const limit = Number(searchParams.get("limit")) || 20;
+    const offset = Number(searchParams.get("offset")) || 0;
+    const search = searchParams.get("search")?.trim();
 
-    // ---------- filters ----------
-    const search = searchParams.get("search");
-    const inStockOnly = searchParams.get("in_stock") === "1";
     const categoryId = searchParams.get("category_id");
     const subcategoryId = searchParams.get("subcategory_id");
+    const inStockOnly = searchParams.get("in_stock") === "1";
+
+    const pool = await getPool();
+
+    /* ---------- SEARCH LOGIC ---------- */
 
     const where: string[] = ["i.active = 1"];
+    const params: Record<string, any> = { limit, offset };
 
+    // 🔴 SEARCH OVERRIDES FILTERS
     if (search) {
-      where.push("i.name LIKE @search");
-    }
-    if (inStockOnly) {
-      where.push("i.stock > 0");
-    }
-    if (subcategoryId) {
-      where.push("i.category_id = @subcategoryId");
-    } else if (categoryId) {
-      where.push(`
-        i.category_id IN (
-          SELECT id FROM dbo.categories WHERE parent_id = @categoryId
-        )
-      `);
+      const words = search
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean);
+
+      words.forEach((word, index) => {
+        where.push(`LOWER(i.name) LIKE @w${index}`);
+        params[`w${index}`] = `%${word}%`;
+      });
+    } else {
+      // Only apply filters if NO search
+      if (subcategoryId) {
+        where.push("i.category_id = @subcategoryId");
+        params.subcategoryId = Number(subcategoryId);
+      } else if (categoryId) {
+        where.push(`
+          i.category_id IN (
+            SELECT id FROM categories WHERE parent_id = @categoryId
+            OR id = @categoryId
+          )
+        `);
+        params.categoryId = Number(categoryId);
+      }
+
+      if (inStockOnly) {
+        where.push("i.stock > 0");
+      }
     }
 
-    const whereClause = where.length
-      ? `WHERE ${where.join(" AND ")}`
-      : "";
+    const whereClause =
+      where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
 
-    // ---------- COUNT ----------
-    const countReq = pool.request();
-    if (search) countReq.input("search", sql.NVarChar, `%${search}%`);
-    if (categoryId) countReq.input("categoryId", sql.Int, Number(categoryId));
-    if (subcategoryId)
-      countReq.input("subcategoryId", sql.Int, Number(subcategoryId));
+    /* ---------- COUNT ---------- */
 
-    const countResult = await countReq.query(`
+    const countQuery = `
       SELECT COUNT(*) AS total
-      FROM dbo.items i
+      FROM items i
       ${whereClause}
-    `);
+    `;
 
+    const countReq = pool.request();
+    Object.entries(params).forEach(([k, v]) => {
+      if (!["limit", "offset"].includes(k)) {
+        countReq.input(k, v);
+      }
+    });
+
+    const countResult = await countReq.query(countQuery);
     const total = countResult.recordset[0].total;
 
-    // ---------- DATA ----------
-    const dataReq = pool.request();
-    if (search) dataReq.input("search", sql.NVarChar, `%${search}%`);
-    if (categoryId) dataReq.input("categoryId", sql.Int, Number(categoryId));
-    if (subcategoryId)
-      dataReq.input("subcategoryId", sql.Int, Number(subcategoryId));
+    /* ---------- DATA ---------- */
 
-    const itemsResult = await dataReq.query(`
+    const dataQuery = `
       SELECT
         i.id,
         i.name,
         i.price_usd,
         i.stock,
         i.category_id
-      FROM dbo.items i
+      FROM items i
       ${whereClause}
       ORDER BY i.name
-      OFFSET ${offset} ROWS
-      FETCH NEXT ${limit} ROWS ONLY
-    `);
+      OFFSET @offset ROWS
+      FETCH NEXT @limit ROWS ONLY
+    `;
+
+    const dataReq = pool.request();
+    Object.entries(params).forEach(([k, v]) => {
+      dataReq.input(k, v);
+    });
+
+    const result = await dataReq.query(dataQuery);
 
     return NextResponse.json({
-      items: itemsResult.recordset,
+      items: result.recordset,
       total,
     });
   } catch (err) {
