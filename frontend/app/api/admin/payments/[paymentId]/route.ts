@@ -14,7 +14,6 @@ export async function GET(req: Request) {
     );
   }
 
-  // ✅ Status filter with default (from original, but aligned to incoming)
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status") ?? "submitted";
 
@@ -22,7 +21,6 @@ export async function GET(req: Request) {
 
   const result = await pool
     .request()
-    // ✅ FIXED: explicit type + length (prevents EPARAM)
     .input("status", sql.VarChar(50), status)
     .query(`
       SELECT

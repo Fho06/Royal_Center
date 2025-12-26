@@ -13,7 +13,7 @@ export function FilterSheet({ onClose }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
-      {/* Top content (fixed) */}
+      {/* Top content */}
       <View style={{ padding: 8 }}>
         {/* Search */}
         <Text style={{ marginBottom: 4, fontSize: 18 }}>Search</Text>
