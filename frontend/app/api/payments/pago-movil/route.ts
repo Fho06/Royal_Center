@@ -4,7 +4,7 @@ import { requireAuth } from "@/lib/auth";
 
 type Body = {
   order_id: number;
-  receiving_account_id?: number; // optional
+  receiving_account_id?: number;
   sender_bank: string;
   reference_number: string;
   amount: number;
@@ -42,9 +42,11 @@ export async function POST(req: Request) {
     );
   }
 
-  // basic validation (no assumptions about exact formats)
   if (String(reference_number).trim().length < 4) {
-    return NextResponse.json({ error: "Invalid reference number" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid reference number" },
+      { status: 400 }
+    );
   }
 
   const pool = await getPool();
@@ -53,12 +55,14 @@ export async function POST(req: Request) {
   try {
     await tx.begin();
 
-    // 1) Verify order ownership + status
+    /* --------------------------------------------------
+       1) Verify order ownership + status
+       -------------------------------------------------- */
     const orderRes = await new sql.Request(tx)
       .input("order_id", sql.Int, order_id)
       .input("user_id", sql.Int, user.userId)
       .query(`
-        SELECT id, user_id, total_amount, status
+        SELECT id, total_amount, status
         FROM dbo.orders
         WHERE id = @order_id AND user_id = @user_id
       `);
@@ -70,7 +74,6 @@ export async function POST(req: Request) {
 
     const order = orderRes.recordset[0];
 
-    // Require correct state
     if (order.status !== "pending_payment") {
       await tx.rollback();
       return NextResponse.json(
@@ -79,7 +82,29 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2) Amount must match order total exactly (your current totals are DECIMAL, so keep it strict)
+    /* --------------------------------------------------
+       2) Prevent duplicate payment submissions
+       -------------------------------------------------- */
+    const existingPayment = await new sql.Request(tx)
+      .input("order_id", sql.Int, order_id)
+      .query(`
+        SELECT 1
+        FROM dbo.payments
+        WHERE order_id = @order_id
+          AND status IN ('submitted', 'approved')
+      `);
+
+    if (existingPayment.recordset.length > 0) {
+      await tx.rollback();
+      return NextResponse.json(
+        { error: "Payment already submitted for this order" },
+        { status: 409 }
+      );
+    }
+
+    /* --------------------------------------------------
+       3) Validate amount
+       -------------------------------------------------- */
     const orderTotal = Number(order.total_amount);
     const submittedAmount = Number(amount);
 
@@ -96,8 +121,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3) Insert payment proof
-    // Unique constraint on (method, reference_number) will enforce uniqueness.
+    /* --------------------------------------------------
+       4) Insert payment (status = submitted)
+       -------------------------------------------------- */
     const insertRes = await new sql.Request(tx)
       .input("order_id", sql.Int, order_id)
       .input("user_id", sql.Int, user.userId)
@@ -117,7 +143,9 @@ export async function POST(req: Request) {
 
     const paymentId = insertRes.recordset[0].id;
 
-    // 4) Update order status to under_review
+    /* --------------------------------------------------
+       5) Move order → under_review
+       -------------------------------------------------- */
     await new sql.Request(tx)
       .input("order_id", sql.Int, order_id)
       .query(`
@@ -135,9 +163,10 @@ export async function POST(req: Request) {
       new_order_status: "under_review",
     });
   } catch (err: any) {
-    try { await tx.rollback(); } catch {}
+    try {
+      await tx.rollback();
+    } catch {}
 
-    // Handle duplicate reference constraint
     const msg = String(err?.message ?? "");
     if (msg.toLowerCase().includes("ux_payments_reference_method")) {
       return NextResponse.json(

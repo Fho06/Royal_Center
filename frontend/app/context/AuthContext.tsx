@@ -2,9 +2,14 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
+type User = {
+  userId: number;
+  role: "admin" | "user";
+};
+
 type AuthContextType = {
-  token: string | null;
   isAuthenticated: boolean;
+  user: User | null;
   login: (token: string) => void;
   logout: () => void;
 };
@@ -12,34 +17,47 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
 
-  // load token ONCE after hydration
+  const isAuthenticated = !!user;
+
+  /* ---------- LOAD TOKEN ON START ---------- */
   useEffect(() => {
-    const stored = localStorage.getItem("token");
-    if (stored) setToken(stored);
-    setHydrated(true);
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      setUser({
+        userId: payload.userId,
+        role: payload.role,
+      });
+    } catch {
+      localStorage.removeItem("token");
+      setUser(null);
+    }
   }, []);
 
+  /* ---------- LOGIN ---------- */
   function login(token: string) {
     localStorage.setItem("token", token);
-    setToken(token); // 🔥 THIS triggers navbar update
+
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    setUser({
+      userId: payload.userId,
+      role: payload.role,
+    });
   }
 
+  /* ---------- LOGOUT ---------- */
   function logout() {
     localStorage.removeItem("token");
-    setToken(null);
+    setUser(null);
   }
 
   return (
     <AuthContext.Provider
-      value={{
-        token,
-        isAuthenticated: !!token,
-        login,
-        logout,
-      }}
+      value={{ isAuthenticated, user, login, logout }}
     >
       {children}
     </AuthContext.Provider>
@@ -49,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error("useAuth must be used inside AuthProvider");
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return ctx;
 }

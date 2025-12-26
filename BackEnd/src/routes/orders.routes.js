@@ -59,9 +59,9 @@ router.post("/orders", requireAuth, async (req, res) => {
         .input("user_id", sql.Int, userId)
         .input("total", sql.Decimal(10, 2), total)
         .query(`
-          INSERT INTO orders (user_id, total_amount)
+          INSERT INTO orders (user_id, total_amount, status)
           OUTPUT INSERTED.id
-          VALUES (@user_id, @total)
+          VALUES (@user_id, @total, 'pending_payment')
         `);
 
       const orderId = orderResult.recordset[0].id;

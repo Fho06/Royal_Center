@@ -35,19 +35,23 @@ export async function GET(
     /* ---------- DB ---------- */
     const pool = await getPool();
 
-    // 🔒 Normalize status so frontend NEVER receives null
+    /* ---------- ORDER ---------- */
     const orderRes = await pool
       .request()
       .input("id", sql.Int, orderId)
       .input("user_id", sql.Int, user.userId)
       .query(`
         SELECT
-          id,
-          total_amount,
-          COALESCE(status, 'pending_payment') AS status,
-          created_at
-        FROM orders
-        WHERE id = @id AND user_id = @user_id
+          o.id,
+          o.total_amount,
+          o.status,
+          s.label AS status_label,
+          o.created_at
+        FROM orders o
+        JOIN order_statuses s
+          ON s.code = o.status
+        WHERE o.id = @id
+          AND o.user_id = @user_id
       `);
 
     if (orderRes.recordset.length === 0) {
@@ -57,6 +61,7 @@ export async function GET(
       );
     }
 
+    /* ---------- ITEMS ---------- */
     const itemsRes = await pool
       .request()
       .input("order_id", sql.Int, orderId)
@@ -66,7 +71,8 @@ export async function GET(
           oi.quantity,
           oi.price
         FROM order_items oi
-        JOIN items i ON i.id = oi.item_id
+        JOIN items i
+          ON i.id = oi.item_id
         WHERE oi.order_id = @order_id
       `);
 

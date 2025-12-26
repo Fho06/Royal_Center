@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getPool, sql } from "@/lib/db";
-import { requireAdmin } from "@//lib/auth";
+import { requireAdmin } from "@/lib/auth";
 
 export async function GET(req: Request) {
   try {
+    // ✅ Admin auth (kept from original)
     requireAdmin(req);
   } catch (e: any) {
     const msg = e?.message;
@@ -13,25 +14,34 @@ export async function GET(req: Request) {
     );
   }
 
+  // ✅ Status filter with default (from original, but aligned to incoming)
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status") ?? "submitted";
 
   const pool = await getPool();
-  const res = await pool
+
+  const result = await pool
     .request()
-    .input("status", sql.VarChar, status)
+    // ✅ FIXED: explicit type + length (prevents EPARAM)
+    .input("status", sql.VarChar(50), status)
     .query(`
       SELECT
-        p.id, p.order_id, p.user_id, p.method, p.sender_bank, p.reference_number,
-        p.amount, p.phone_last4, p.status, p.submitted_at,
-        o.total_amount, o.status AS order_status, o.created_at AS order_created_at,
+        p.id,
+        p.order_id,
+        p.user_id,
+        p.amount,
+        p.method,
+        p.reference_number,
+        p.sender_bank,
+        p.phone_last4,
+        p.status,
+        p.created_at,
         u.email
       FROM dbo.payments p
-      JOIN dbo.orders o ON o.id = p.order_id
       JOIN dbo.users u ON u.id = p.user_id
       WHERE p.status = @status
-      ORDER BY p.submitted_at DESC
+      ORDER BY p.created_at ASC
     `);
 
-  return NextResponse.json({ payments: res.recordset });
+  return NextResponse.json({ payments: result.recordset });
 }
