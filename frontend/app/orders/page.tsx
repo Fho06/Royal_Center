@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/app/context/AuthContext"; // ✅ ADD
 
 type Order = {
   id: number;
@@ -14,12 +15,24 @@ type Order = {
 
 export default function OrdersPage() {
   const router = useRouter();
+  const { loading: authLoading, isAuthenticated } = useAuth(); // ✅ ADD
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [status, setStatus] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    // ⛔ WAIT until auth is hydrated
+    if (authLoading) return;
+
+    // ⛔ Do not call protected API if not logged in
+    if (!isAuthenticated) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
+
     async function load() {
       setLoading(true);
       setError("");
@@ -30,7 +43,6 @@ export default function OrdersPage() {
 
         const data = await apiRequest(`/orders?${params.toString()}`);
 
-        // ✅ CRITICAL LINE
         setOrders(Array.isArray(data.orders) ? data.orders : []);
       } catch (err: any) {
         setError(err.message || "Failed to load orders");
@@ -41,7 +53,7 @@ export default function OrdersPage() {
     }
 
     load();
-  }, [status]);
+  }, [status, authLoading, isAuthenticated]); // ✅ UPDATE deps
 
   if (loading) {
     return <div className="p-6">Loading orders…</div>;
@@ -61,6 +73,7 @@ export default function OrdersPage() {
         className="border rounded px-3 py-2 mb-4"
       >
         <option value="all">All</option>
+        <option value ="draft">Borrador</option>
         <option value="pending_payment">Pago Pendiente</option>
         <option value="under_review">En Revisión</option>
         <option value="order_placed">Pedido Realizado</option>
@@ -86,6 +99,25 @@ export default function OrdersPage() {
             <p className="text-sm text-gray-500">
               {new Date(order.created_at).toLocaleString()}
             </p>
+            {/* Order Cards */}
+            <div className="mt-3 flex gap-4">
+              {order.status === "draft" && (
+                <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                  Draft
+                </span>
+              )}
+              {order.status === "draft" && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/orders/${order.id}/edit`);
+                  }}
+                  className="text-blue-600 underline text-sm"
+                >
+                  Edit Order
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>

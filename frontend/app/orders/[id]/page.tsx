@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/api";
-import { isLoggedIn } from "@/lib/auth";
+import { useAuth } from "@/app/context/AuthContext";
 import { useParams, useRouter } from "next/navigation";
 
 /* ---------- TYPES ---------- */
@@ -26,6 +26,7 @@ type Order = {
 export default function OrderDetailsPage() {
   const router = useRouter();
   const params = useParams();
+  const { loading: authLoading, isAuthenticated } = useAuth();
 
   const orderId =
     typeof params.id === "string"
@@ -42,7 +43,10 @@ export default function OrderDetailsPage() {
   /* ---------- AUTH + FETCH ---------- */
 
   useEffect(() => {
-    if (!isLoggedIn()) {
+    // ⛔ wait until auth state is resolved
+    if (authLoading) return;
+
+    if (!isAuthenticated) {
       router.push("/login");
       return;
     }
@@ -66,11 +70,11 @@ export default function OrderDetailsPage() {
     }
 
     load();
-  }, [orderId, router]);
+  }, [authLoading, isAuthenticated, orderId, router]);
 
   /* ---------- STATES ---------- */
 
-  if (loading) {
+  if (authLoading || loading) {
     return <div className="p-6">Loading order…</div>;
   }
 
@@ -94,6 +98,19 @@ export default function OrderDetailsPage() {
 
   return (
     <main className="p-6 max-w-3xl mx-auto space-y-6">
+      <div className="mt-3 flex gap-4">
+        {order.status === "draft" && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/orders/${order.id}/edit`);
+            }}
+            className="text-blue-600 underline text-sm"
+          >
+            Edit Order
+          </button>
+        )}
+      </div>
       <div>
         <h1 className="text-2xl font-bold">
           Order #{order.id}

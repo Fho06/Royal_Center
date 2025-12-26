@@ -6,45 +6,40 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
  * - Uses same-origin Next.js API routes by default
  * - Automatically attaches auth token if present
  */
-export async function apiRequest(
-  endpoint: string,
-  options: RequestInit = {}
-) {
-  const token =
-    typeof window !== "undefined"
+export async function apiRequest(endpoint: string, options: RequestInit = {}) {
+  const makeRequest = async () => {
+    const token = typeof window !== "undefined"
       ? localStorage.getItem("token")
       : null;
 
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(options.headers || {}),
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    };
+
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "API request failed");
+    }
+
+    return res.json();
   };
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  let data: any = null;
-
-  // Safely parse response (supports 204, JSON, and text)
-  if (response.status !== 204) {
-    const contentType = response.headers.get("content-type");
-
-    if (contentType && contentType.includes("application/json")) {
-      data = await response.json();
-    } else {
-      data = await response.text();
+  try {
+    return await makeRequest();
+  } catch (err: any) {
+    // 🔁 retry once after short delay
+    if (err.message === "Unauthorized") {
+      await new Promise(r => setTimeout(r, 300));
+      return makeRequest();
     }
+    throw err;
   }
-
-  if (!response.ok) {
-    throw new Error(
-      (data && typeof data === "object" && data.error) ||
-        "API request failed"
-    );
-  }
-
-  return data;
 }
+
