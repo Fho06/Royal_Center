@@ -68,7 +68,7 @@ export default function OrderDetailsPage() {
       <p className="mb-6 text-sm">
         Status:{" "}
         <span className="font-semibold">
-          {order.status.replace("_", " ")}
+          {(order.status ?? "unknown").replace(/_/g, " ")}
         </span>
       </p>
 

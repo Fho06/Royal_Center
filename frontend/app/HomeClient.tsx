@@ -34,7 +34,6 @@ export default function HomeClient() {
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   // hydration guard
   const [hydrated, setHydrated] = useState(false);
@@ -45,7 +44,7 @@ export default function HomeClient() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSubcategory, setSelectedSubcategory] = useState("all");
 
-  // 🔹 PRICE FILTERS
+  // price filters
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
 
@@ -53,7 +52,6 @@ export default function HomeClient() {
   const ITEMS_PER_PAGE = 20;
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
   /* ---------- HYDRATION ---------- */
@@ -95,11 +93,10 @@ export default function HomeClient() {
       }
 
       const data = await apiRequest(`/items?${params.toString()}`);
-
       setItems(Array.isArray(data.items) ? data.items : []);
       setTotalItems(Number(data.total) || 0);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Failed to fetch items");
     }
   }
 
@@ -118,7 +115,6 @@ export default function HomeClient() {
     if (!hydrated) return;
 
     const url = new URL(window.location.href);
-
     const set = (k: string, v: string | null) => {
       if (!v || v === "all") url.searchParams.delete(k);
       else url.searchParams.set(k, v);
@@ -144,6 +140,7 @@ export default function HomeClient() {
     minPrice,
     maxPrice,
     currentPage,
+    router,
   ]);
 
   /* ---------- EFFECTS ---------- */
@@ -166,7 +163,6 @@ export default function HomeClient() {
     fetchCategories();
   }, []);
 
-  // reset page when filters change
   useEffect(() => {
     if (!hydrated) return;
     setCurrentPage(1);
@@ -225,60 +221,51 @@ export default function HomeClient() {
     });
   }
 
-    async function placeOrder() {
+  /* ---------- PLACE ORDER (FIXED) ---------- */
+
+  async function placeOrder() {
     setError("");
-    setMessage("");
 
     if (!isLoggedIn()) {
-        router.push("/login");
-        return;
+      router.push("/login");
+      return;
     }
 
     if (cart.length === 0) {
-        setError("Cart is empty");
-        return;
+      setError("Cart is empty");
+      return;
     }
 
     try {
-        const data = await apiRequest("/orders", {
+      const data = await apiRequest("/orders", {
         method: "POST",
         body: JSON.stringify({
-            items: cart.map(c => ({
+          items: cart.map(c => ({
             item_id: c.item_id,
             quantity: c.quantity,
-            })),
+          })),
         }),
-        });
+      });
 
-        // EXPECT backend to return { orderId }
-        const orderId = data.orderId ?? data.id;
+      const orderId = data?.orderId;
+      if (!orderId) throw new Error("Order ID missing from response");
 
-        if (!orderId) {
-        throw new Error("Order ID missing from response");
-        }
-
-        // Clear cart AFTER order is created
-        setCart([]);
-
-        // Redirect to payment page
-        router.push(`/checkout/pay/${orderId}`);
+      setCart([]);
+      router.push(`/checkout/pay/${orderId}`);
     } catch (err: any) {
-        setError(err.message || "Failed to place order");
+      setError(err.message || "Failed to place order");
     }
-}
+  }
 
-
-    const total = cart.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-    );
+  const total = cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
 
   /* ---------- RENDER ---------- */
 
   return (
     <main className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-
-      {/* FILTER + CART ROW */}
       <section className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
 
         {/* FILTERS */}
@@ -376,7 +363,6 @@ export default function HomeClient() {
           </button>
 
           {error && <p className="text-red-600 mt-2">{error}</p>}
-          {message && <p className="text-green-600 mt-2">{message}</p>}
         </aside>
       </section>
 

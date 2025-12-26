@@ -25,7 +25,7 @@ export async function GET(
     const { id } = await params;
     const orderId = Number(id);
 
-    if (isNaN(orderId)) {
+    if (!Number.isFinite(orderId)) {
       return NextResponse.json(
         { error: "Invalid order id" },
         { status: 400 }
@@ -35,12 +35,17 @@ export async function GET(
     /* ---------- DB ---------- */
     const pool = await getPool();
 
+    // 🔒 Normalize status so frontend NEVER receives null
     const orderRes = await pool
       .request()
       .input("id", sql.Int, orderId)
       .input("user_id", sql.Int, user.userId)
       .query(`
-        SELECT id, total_amount, created_at
+        SELECT
+          id,
+          total_amount,
+          COALESCE(status, 'pending_payment') AS status,
+          created_at
         FROM orders
         WHERE id = @id AND user_id = @user_id
       `);

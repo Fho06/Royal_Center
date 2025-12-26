@@ -1,19 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
-
-type PaymentAccount = {
-  id: number;
-  bank_name: string;
-  bank_code: string | null;
-  phone: string;
-  rif: string;
-  beneficiary_name: string | null;
-  currency: string;
-};
+import { useParams, useRouter } from "next/navigation";
 
 type Order = {
   id: number;
@@ -21,22 +11,38 @@ type Order = {
   status: string;
 };
 
+type PaymentAccount = {
+  id: number;
+  bank_name: string;
+  phone: string;
+  rif: string;
+  beneficiary_name: string | null;
+};
+
 export default function PagoMovilPage() {
-  const params = useParams();
-    const orderId = Array.isArray(params.orderId)
-    ? params.orderId[0]
-    : params.orderId;
-  if (!orderId) {
-    return <div className="p-6 text-red-600">Invalid order ID</div>;
-  }
   const router = useRouter();
+  const params = useParams();
+
+  // 🔒 Freeze orderId ONCE (type-safe)
+  const orderIdRef = useRef<string | null>(null);
+
+  if (orderIdRef.current === null) {
+    const raw = params.orderId;
+    orderIdRef.current =
+      typeof raw === "string"
+        ? raw
+        : Array.isArray(raw)
+        ? raw[0]
+        : null;
+  }
+
+  const orderId = orderIdRef.current;
 
   const [order, setOrder] = useState<Order | null>(null);
   const [accounts, setAccounts] = useState<PaymentAccount[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  // payment form
   const [senderBank, setSenderBank] = useState("");
   const [reference, setReference] = useState("");
   const [amount, setAmount] = useState("");
@@ -49,6 +55,12 @@ export default function PagoMovilPage() {
       return;
     }
 
+    if (!orderId) {
+      setError("Invalid order ID");
+      setLoading(false);
+      return;
+    }
+
     async function load() {
       try {
         const [orderRes, accountsRes] = await Promise.all([
@@ -56,8 +68,8 @@ export default function PagoMovilPage() {
           apiRequest(`/payment-accounts?method=pago_movil`),
         ]);
 
-        setOrder(orderRes.order ?? orderRes);
-        setAccounts(accountsRes.accounts ?? []);
+        setOrder(orderRes.order);
+        setAccounts(accountsRes.accounts || []);
       } catch (e: any) {
         setError(e.message || "Failed to load payment info");
       } finally {
@@ -68,57 +80,58 @@ export default function PagoMovilPage() {
     load();
   }, [orderId, router]);
 
-async function submitPayment() {
-  if (!order || !orderId) return;
+  async function submitPayment() {
+    if (!order) return;
 
-  if (!senderBank || !reference || !amount) {
-    setError("Please fill all required fields");
-    return; // ⛔ STOP HERE
+    if (!senderBank || !reference || !amount) {
+      setError("Please fill all required fields");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+
+    try {
+      await apiRequest("/payments/pago-movil", {
+        method: "POST",
+        body: JSON.stringify({
+          order_id: order.id,
+          sender_bank: senderBank,
+          reference_number: reference,
+          amount: Number(amount),
+          phone_last4: phoneLast4 || undefined,
+        }),
+      });
+
+      router.push(`/orders/${order.id}`);
+    } catch (e: any) {
+      setError(e.message || "Payment submission failed");
+    } finally {
+      setSubmitting(false);
+    }
   }
-
-  setSubmitting(true);
-  setError("");
-
-  try {
-    await apiRequest("/payments/pago-movil", {
-      method: "POST",
-      body: JSON.stringify({
-        order_id: order.id,
-        sender_bank: senderBank,
-        reference_number: reference,
-        amount: Number(amount),
-        phone_last4: phoneLast4 || undefined,
-      }),
-    });
-
-    router.push(`/orders/${order.id}`);
-  } catch (e: any) {
-    setError(e.message || "Failed to submit payment");
-  } finally {
-    setSubmitting(false);
-  }
-}
-
 
   if (loading) {
     return <div className="p-6">Loading payment details…</div>;
   }
 
-  if (error) {
-    return <div className="p-6 text-red-600">{error}</div>;
-  }
-
   if (!order) {
-    return <div className="p-6">Order not found</div>;
+    return <div className="p-6 text-red-600">{error || "Order not found"}</div>;
   }
 
-  const account = accounts[0]; // single account for now
+  const account = accounts[0];
 
   return (
     <main className="p-6 max-w-xl mx-auto space-y-6">
       <h1 className="text-2xl font-semibold">Pago Móvil</h1>
 
-      <div className="border rounded p-4 space-y-2">
+      {error && (
+        <div className="rounded border border-red-400 bg-red-50 p-3 text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="border rounded p-4 space-y-1">
         <p><strong>Order ID:</strong> {order.id}</p>
         <p><strong>Total:</strong> ${order.total_amount.toFixed(2)}</p>
         <p><strong>Status:</strong> {order.status}</p>
@@ -126,7 +139,6 @@ async function submitPayment() {
 
       {account && (
         <div className="border rounded p-4 space-y-1">
-          <h2 className="font-semibold mb-2">Send payment to:</h2>
           <p><strong>Bank:</strong> {account.bank_name}</p>
           <p><strong>Phone:</strong> {account.phone}</p>
           <p><strong>RIF:</strong> {account.rif}</p>
@@ -137,8 +149,6 @@ async function submitPayment() {
       )}
 
       <div className="border rounded p-4 space-y-3">
-        <h2 className="font-semibold">Confirm Payment</h2>
-
         <input
           placeholder="Sender bank"
           value={senderBank}
@@ -154,7 +164,7 @@ async function submitPayment() {
         />
 
         <input
-          placeholder="Amount sent"
+          placeholder="Amount"
           type="number"
           value={amount}
           onChange={e => setAmount(e.target.value)}
