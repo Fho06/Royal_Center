@@ -22,7 +22,13 @@ type Order = {
 };
 
 export default function PagoMovilPage() {
-  const { orderId } = useParams<{ orderId: string }>();
+  const params = useParams();
+    const orderId = Array.isArray(params.orderId)
+    ? params.orderId[0]
+    : params.orderId;
+  if (!orderId) {
+    return <div className="p-6 text-red-600">Invalid order ID</div>;
+  }
   const router = useRouter();
 
   const [order, setOrder] = useState<Order | null>(null);
@@ -62,36 +68,37 @@ export default function PagoMovilPage() {
     load();
   }, [orderId, router]);
 
-  async function submitPayment() {
-    if (!order) return;
+async function submitPayment() {
+  if (!order || !orderId) return;
 
-    if (!senderBank || !reference || !amount) {
-      setError("Please fill all required fields");
-      return;
-    }
-
-    setSubmitting(true);
-    setError("");
-
-    try {
-      await apiRequest("/payments/pago-movil", {
-        method: "POST",
-        body: JSON.stringify({
-          order_id: order.id,
-          sender_bank: senderBank,
-          reference_number: reference,
-          amount: Number(amount),
-          phone_last4: phoneLast4 || undefined,
-        }),
-      });
-
-      router.push(`/orders/${order.id}`);
-    } catch (e: any) {
-      setError(e.message || "Failed to submit payment");
-    } finally {
-      setSubmitting(false);
-    }
+  if (!senderBank || !reference || !amount) {
+    setError("Please fill all required fields");
+    return; // ⛔ STOP HERE
   }
+
+  setSubmitting(true);
+  setError("");
+
+  try {
+    await apiRequest("/payments/pago-movil", {
+      method: "POST",
+      body: JSON.stringify({
+        order_id: order.id,
+        sender_bank: senderBank,
+        reference_number: reference,
+        amount: Number(amount),
+        phone_last4: phoneLast4 || undefined,
+      }),
+    });
+
+    router.push(`/orders/${order.id}`);
+  } catch (e: any) {
+    setError(e.message || "Failed to submit payment");
+  } finally {
+    setSubmitting(false);
+  }
+}
+
 
   if (loading) {
     return <div className="p-6">Loading payment details…</div>;
