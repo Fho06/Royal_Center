@@ -88,7 +88,6 @@ export async function POST(req: Request) {
 
         total += dbItem.price_usd * item.quantity;
       }
-
         const orderRes = await tx
         .request()
         .input("user_id", sql.Int, user.userId)
@@ -98,7 +97,8 @@ export async function POST(req: Request) {
             OUTPUT INSERTED.id
             VALUES (@user_id, @total, 'pending_payment')
         `);
-      const orderId = orderRes.recordset[0].id;
+
+        const orderId = orderRes.recordset[0].id;
 
       for (const item of items) {
         const priceRes = await tx
