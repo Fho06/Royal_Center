@@ -102,7 +102,7 @@ export default function PagoMovilPage() {
           phone_last4: phoneLast4 || undefined,
         }),
       });
-
+      setCart([]);
       router.push(`/orders/${order.id}`);
     } catch (e: any) {
       setError(e.message || "Payment submission failed");
@@ -123,6 +123,12 @@ export default function PagoMovilPage() {
 
   return (
     <main className="p-6 max-w-xl mx-auto space-y-6">
+      <button
+        onClick={() => router.back()}
+        className="text-sm text-gray-600 underline mb-4"
+      >
+        ← Back
+      </button>
       <h1 className="text-2xl font-semibold">Pago Móvil</h1>
 
       {error && (
@@ -189,3 +195,7 @@ export default function PagoMovilPage() {
     </main>
   );
 }
+function setCart(arg0: never[]) {
+  throw new Error("Function not implemented.");
+}
+

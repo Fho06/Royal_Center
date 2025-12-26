@@ -61,7 +61,7 @@ router.post("/orders", requireAuth, async (req, res) => {
         .query(`
           INSERT INTO orders (user_id, total_amount, status)
           OUTPUT INSERTED.id
-          VALUES (@user_id, @total, 'pending_payment')
+          VALUES (@user_id, @total, 'draft')
         `);
 
       const orderId = orderResult.recordset[0].id;

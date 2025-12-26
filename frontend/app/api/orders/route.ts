@@ -6,12 +6,11 @@ function getUserFromRequest(req: Request) {
   const auth = req.headers.get("authorization");
   if (!auth) return null;
 
-  const token = auth.replace("Bearer ", "");
   try {
-    return jwt.verify(token, process.env.JWT_SECRET!) as {
-      userId: number;
-      role?: string;
-    };
+    return jwt.verify(
+      auth.replace("Bearer ", ""),
+      process.env.JWT_SECRET!
+    ) as { userId: number; role?: string };
   } catch {
     return null;
   }
@@ -32,13 +31,11 @@ export async function GET(req: Request) {
     const status = searchParams.get("status");
 
     const pool = await getPool();
-    const request = pool
-      .request()
-      .input("user_id", sql.Int, user.userId);
+    const request = pool.request().input("user_id", sql.Int, user.userId);
 
     let whereClause = "WHERE o.user_id = @user_id";
 
-    if (status) {
+    if (status && status !== "all") {
       request.input("status", sql.VarChar, status);
       whereClause += " AND o.status = @status";
     }
@@ -68,6 +65,7 @@ export async function GET(req: Request) {
 
 /* ===============================
    POST /api/orders
+   CREATE DRAFT ORDER
    =============================== */
 export async function POST(req: Request) {
   try {
@@ -93,7 +91,7 @@ export async function POST(req: Request) {
 
       /* ---------- VALIDATE + CALCULATE ---------- */
       for (const item of items) {
-        const priceRes = await tx
+        const res = await tx
           .request()
           .input("id", sql.VarChar, item.item_id)
           .query(`
@@ -102,12 +100,11 @@ export async function POST(req: Request) {
             WHERE id = @id
           `);
 
-        if (priceRes.recordset.length === 0) {
+        if (res.recordset.length === 0) {
           throw new Error("Item not found");
         }
 
-        const dbItem = priceRes.recordset[0];
-
+        const dbItem = res.recordset[0];
         if (item.quantity > dbItem.stock) {
           throw new Error("Insufficient stock");
         }
@@ -115,7 +112,7 @@ export async function POST(req: Request) {
         total += dbItem.price_usd * item.quantity;
       }
 
-      /* ---------- CREATE ORDER ---------- */
+      /* ---------- CREATE DRAFT ORDER ---------- */
       const orderRes = await tx
         .request()
         .input("user_id", sql.Int, user.userId)
@@ -123,12 +120,12 @@ export async function POST(req: Request) {
         .query(`
           INSERT INTO orders (user_id, total_amount, status)
           OUTPUT INSERTED.id
-          VALUES (@user_id, @total, 'pending_payment')
+          VALUES (@user_id, @total, 'draft')
         `);
 
       const orderId = orderRes.recordset[0].id;
 
-      /* ---------- INSERT ITEMS + UPDATE STOCK ---------- */
+      /* ---------- INSERT ORDER ITEMS ---------- */
       for (const item of items) {
         const priceRes = await tx
           .request()
@@ -151,16 +148,6 @@ export async function POST(req: Request) {
             INSERT INTO order_items (order_id, item_id, quantity, price)
             VALUES (@order_id, @item_id, @quantity, @price)
           `);
-
-        await tx
-          .request()
-          .input("id", sql.VarChar, item.item_id)
-          .input("qty", sql.Int, item.quantity)
-          .query(`
-            UPDATE items
-            SET stock = stock - @qty
-            WHERE id = @id
-          `);
       }
 
       await tx.commit();
@@ -172,7 +159,7 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("Order create error:", err);
     return NextResponse.json(
-      { error: "Failed to place order" },
+      { error: "Failed to create order" },
       { status: 500 }
     );
   }

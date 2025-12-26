@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { useCart } from "@/context/CartContext";
-import { isLoggedIn } from "@/lib/auth";
 import { useSearchParams, useRouter } from "next/navigation";
 
 /* ---------- TYPES ---------- */
@@ -216,45 +215,48 @@ export default function HomeClient() {
           name: item.name,
           price: item.price_usd,
           quantity: 1,
+          stock : item.stock,
         },
       ];
     });
   }
 
-  /* ---------- PLACE ORDER (FIXED) ---------- */
+  function increaseQty(itemId: string) {
+    setCart(prev => {
+      const current = prev.find(i => i.item_id === itemId);
+      if (!current) return prev;
 
-  async function placeOrder() {
-    setError("");
+      const remaining = getRemainingStock(itemId);
+      if (remaining <= 0) return prev; // ⛔ block
 
-    if (!isLoggedIn()) {
-      router.push("/login");
-      return;
-    }
+      return prev.map(item =>
+        item.item_id === itemId
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      );
+    });
+  }
 
-    if (cart.length === 0) {
-      setError("Cart is empty");
-      return;
-    }
+  function decreaseQty(itemId: string) {
+    setCart(prev =>
+      prev
+        .map(item =>
+          item.item_id === itemId
+            ? { ...item, quantity: item.quantity - 1 }
+            : item
+        )
+        .filter(item => item.quantity > 0)
+    );
+  }
 
-    try {
-      const data = await apiRequest("/orders", {
-        method: "POST",
-        body: JSON.stringify({
-          items: cart.map(c => ({
-            item_id: c.item_id,
-            quantity: c.quantity,
-          })),
-        }),
-      });
+  function removeFromCart(itemId: string) {
+    setCart(prev => prev.filter(item => item.item_id !== itemId));
+  }
 
-      const orderId = data?.orderId;
-      if (!orderId) throw new Error("Order ID missing from response");
-
-      setCart([]);
-      router.push(`/checkout/pay/${orderId}`);
-    } catch (err: any) {
-      setError(err.message || "Failed to place order");
-    }
+  function getRemainingStock(itemId: string) {
+    const product = items.find(p => p.id === itemId);
+    const inCart = cart.find(c => c.item_id === itemId)?.quantity || 0;
+    return product ? product.stock - inCart : 0;
   }
 
   const total = cart.reduce(
@@ -345,9 +347,36 @@ export default function HomeClient() {
           )}
 
           {cart.map(item => (
-            <div key={item.item_id} className="flex justify-between mb-2">
-              <span>{item.name}</span>
-              <span>{item.quantity}</span>
+            <div
+              key={item.item_id}
+              className="flex items-center justify-between mb-2 text-sm"
+            >
+              <span className="flex-1">{item.name}</span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => decreaseQty(item.item_id)}
+                  className="px-2 border rounded"
+                >
+                  −
+                </button>
+
+                <span>{item.quantity}</span>
+
+                <button
+                  onClick={() => increaseQty(item.item_id)}
+                  disabled={getRemainingStock(item.item_id) <= 0}
+                  className="px-2 border rounded disabled:opacity-40"
+                >
+                  +
+                </button>
+                <button
+                  onClick={() => removeFromCart(item.item_id)}
+                  className="text-red-600 text-xs"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           ))}
 
@@ -356,10 +385,10 @@ export default function HomeClient() {
           </p>
 
           <button
-            onClick={placeOrder}
+            onClick={() => router.push("/checkout")}
             className="mt-3 w-full bg-black text-white py-2 rounded"
           >
-            Place Order
+            Proceed to Checkout
           </button>
 
           {error && <p className="text-red-600 mt-2">{error}</p>}
@@ -368,28 +397,30 @@ export default function HomeClient() {
 
       {/* PRODUCTS */}
       <section className="md:col-span-2 space-y-4">
-        {items.map(item => (
-          <div
-            key={item.id}
-            className="border rounded p-4 flex justify-between"
-          >
-            <div>
-              <h3 className="font-semibold">{item.name}</h3>
-              <p>${item.price_usd.toFixed(2)}</p>
-              <p className="text-sm text-gray-500">
-                Stock: {remainingStock(item)}
-              </p>
-            </div>
-
-            <button
-              onClick={() => addToCart(item)}
-              disabled={remainingStock(item) <= 0}
-              className="bg-black text-white px-4 py-2 rounded disabled:opacity-50"
+        {items
+          .filter(item => item.price_usd > 0)
+          .map(item => (
+            <div
+              key={item.id}
+              className="border rounded p-4 flex justify-between"
             >
-              Add
-            </button>
-          </div>
-        ))}
+              <div>
+                <h3 className="font-semibold">{item.name}</h3>
+                <p>${item.price_usd.toFixed(2)}</p>
+                <p className="text-sm text-gray-500">
+                  Stock: {remainingStock(item)}
+                </p>
+              </div>
+
+              <button
+                onClick={() => addToCart(item)}
+                disabled={remainingStock(item) <= 0}
+                className="bg-black text-white px-4 py-2 rounded disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          ))}
 
         {totalPages > 1 && (
           <div className="flex justify-center gap-4">
