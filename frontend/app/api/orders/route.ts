@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getPool, sql } from "@/lib/db";
 import jwt from "jsonwebtoken";
 
+/* ---------- AUTH ---------- */
 function getUserFromRequest(req: Request) {
   const auth = req.headers.get("authorization");
   if (!auth) return null;
@@ -18,7 +19,7 @@ function getUserFromRequest(req: Request) {
 
 /* ===============================
    GET /api/orders
-   Supports ?status=
+   USER ORDER HISTORY (NO DRAFTS)
    =============================== */
 export async function GET(req: Request) {
   try {
@@ -31,9 +32,14 @@ export async function GET(req: Request) {
     const status = searchParams.get("status");
 
     const pool = await getPool();
-    const request = pool.request().input("user_id", sql.Int, user.userId);
+    const request = pool
+      .request()
+      .input("user_id", sql.Int, user.userId);
 
-    let whereClause = "WHERE o.user_id = @user_id";
+    let whereClause = `
+      WHERE o.user_id = @user_id
+      AND o.status NOT IN ('pending_payment', 'draft')
+    `;
 
     if (status && status !== "all") {
       request.input("status", sql.VarChar, status);
@@ -65,7 +71,7 @@ export async function GET(req: Request) {
 
 /* ===============================
    POST /api/orders
-   CREATE DRAFT ORDER
+   CREATE REAL ORDER (NO DRAFTS)
    =============================== */
 export async function POST(req: Request) {
   try {
@@ -89,7 +95,7 @@ export async function POST(req: Request) {
     try {
       let total = 0;
 
-      /* ---------- VALIDATE + CALCULATE ---------- */
+      // Validate stock + calculate total
       for (const item of items) {
         const res = await tx
           .request()
@@ -112,7 +118,7 @@ export async function POST(req: Request) {
         total += dbItem.price_usd * item.quantity;
       }
 
-      /* ---------- CREATE DRAFT ORDER ---------- */
+      // Create real order
       const orderRes = await tx
         .request()
         .input("user_id", sql.Int, user.userId)
@@ -120,33 +126,35 @@ export async function POST(req: Request) {
         .query(`
           INSERT INTO orders (user_id, total_amount, status)
           OUTPUT INSERTED.id
-          VALUES (@user_id, @total, 'draft')
+          VALUES (@user_id, @total, 'pending_payment')
         `);
 
       const orderId = orderRes.recordset[0].id;
 
-      /* ---------- INSERT ORDER ITEMS ---------- */
+      // Insert items + deduct stock
       for (const item of items) {
         const priceRes = await tx
           .request()
           .input("id", sql.VarChar, item.item_id)
-          .query(`
-            SELECT price_usd
-            FROM items
-            WHERE id = @id
-          `);
-
-        const price = priceRes.recordset[0].price_usd;
+          .query(`SELECT price_usd FROM items WHERE id = @id`);
 
         await tx
           .request()
           .input("order_id", sql.Int, orderId)
           .input("item_id", sql.VarChar, item.item_id)
           .input("quantity", sql.Int, item.quantity)
-          .input("price", sql.Decimal(10, 2), price)
+          .input("price", sql.Decimal(10, 2), priceRes.recordset[0].price_usd)
           .query(`
             INSERT INTO order_items (order_id, item_id, quantity, price)
             VALUES (@order_id, @item_id, @quantity, @price)
+          `);
+
+        await tx
+          .request()
+          .input("id", sql.VarChar, item.item_id)
+          .input("qty", sql.Int, item.quantity)
+          .query(`
+            UPDATE items SET stock = stock - @qty WHERE id = @id
           `);
       }
 

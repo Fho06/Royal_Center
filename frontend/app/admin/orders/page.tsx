@@ -13,10 +13,10 @@ type Order = {
   total_amount: number;
   status: string;
   status_label: string;
+  created_at: string;
 };
 
 const STATUSES = [
-    
   "pending_payment",
   "under_review",
   "order_placed",
@@ -35,31 +35,44 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [status, setStatus] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   async function load() {
     setLoading(true);
+    setError("");
 
-    const params = new URLSearchParams();
-    if (status !== "all") params.set("status", status);
+    try {
+      const params = new URLSearchParams();
+      if (status !== "all") params.set("status", status);
 
-    const data = await apiRequest(`/admin/orders?${params}`);
-    setOrders(data.orders);
+      const data = await apiRequest(
+        `/admin/orders?${params.toString()}`
+      );
 
-    setLoading(false);
+      setOrders(Array.isArray(data.orders) ? data.orders : []);
+    } catch (err: any) {
+      setError(err.message || "Failed to load admin orders");
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function updateStatus(orderId: number, status: string) {
-    await apiRequest(`/admin/orders/${orderId}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status }),
-    });
-    load();
+  async function updateStatus(orderId: number, newStatus: string) {
+    try {
+      await apiRequest(`/admin/orders/${orderId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      load();
+    } catch {
+      alert("Failed to update order status");
+    }
   }
 
   /* ---------- AUTH + FETCH ---------- */
 
   useEffect(() => {
-    // ⛔ wait for auth resolution
     if (authLoading) return;
 
     if (!isAuthenticated) {
@@ -68,7 +81,7 @@ export default function AdminOrdersPage() {
     }
 
     load();
-  }, [authLoading, isAuthenticated, status, router]);
+  }, [authLoading, isAuthenticated, status]);
 
   /* ---------- STATES ---------- */
 
@@ -76,18 +89,22 @@ export default function AdminOrdersPage() {
     return <div className="p-6">Loading orders…</div>;
   }
 
+  if (error) {
+    return <div className="p-6 text-red-600">{error}</div>;
+  }
+
   /* ---------- RENDER ---------- */
 
   return (
-    <main className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">
+    <main className="p-6 max-w-5xl mx-auto space-y-4">
+      <h1 className="text-2xl font-bold">
         Admin — Orders
       </h1>
 
       <select
         value={status}
         onChange={e => setStatus(e.target.value)}
-        className="border px-3 py-2 mb-4"
+        className="border px-3 py-2"
       >
         <option value="all">All</option>
         {STATUSES.map(s => (
@@ -99,13 +116,30 @@ export default function AdminOrdersPage() {
 
       <div className="space-y-4">
         {orders.map(o => (
-          <div key={o.id} className="border p-4 rounded">
-            <p className="font-semibold">
-              Order #{o.id}
-            </p>
-            <p>User: {o.email}</p>
-            <p>Status: {o.status_label}</p>
+          <div
+            key={o.id}
+            className="border p-4 rounded space-y-1"
+          >
+            <div className="flex justify-between">
+              <p className="font-semibold">
+                Order #{o.id}
+              </p>
+              <p className="text-sm text-gray-500">
+                {new Date(o.created_at).toLocaleString()}
+              </p>
+            </div>
+
             <p>
+              <span className="font-medium">User:</span>{" "}
+              {o.email}
+            </p>
+
+            <p>
+              <span className="font-medium">Status:</span>{" "}
+              {o.status_label}
+            </p>
+
+            <p className="font-bold">
               Total: ${o.total_amount.toFixed(2)}
             </p>
 
