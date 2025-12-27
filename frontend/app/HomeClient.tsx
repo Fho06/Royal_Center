@@ -43,10 +43,6 @@ export default function HomeClient() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSubcategory, setSelectedSubcategory] = useState("all");
 
-  // price filters
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
-
   /* ---------- PAGINATION ---------- */
   const ITEMS_PER_PAGE = 20;
   const [currentPage, setCurrentPage] = useState(1);
@@ -66,8 +62,6 @@ export default function HomeClient() {
     setInStockOnly(searchParams.get("in_stock") === "1");
     setSelectedCategory(searchParams.get("category") || "all");
     setSelectedSubcategory(searchParams.get("subcategory") || "all");
-    setMinPrice(searchParams.get("min_price") || "");
-    setMaxPrice(searchParams.get("max_price") || "");
     setCurrentPage(Number(searchParams.get("page")) || 1);
   }, [hydrated, searchParams]);
 
@@ -82,8 +76,6 @@ export default function HomeClient() {
 
       if (search) params.append("search", search);
       if (inStockOnly) params.append("in_stock", "1");
-      if (minPrice) params.append("min_price", minPrice);
-      if (maxPrice) params.append("max_price", maxPrice);
 
       if (selectedSubcategory !== "all") {
         params.append("subcategory_id", selectedSubcategory);
@@ -123,8 +115,6 @@ export default function HomeClient() {
     set("category", selectedCategory);
     set("subcategory", selectedSubcategory);
     set("in_stock", inStockOnly ? "1" : null);
-    set("min_price", minPrice);
-    set("max_price", maxPrice);
     set("page", currentPage.toString());
 
     router.replace(url.pathname + "?" + url.searchParams.toString(), {
@@ -136,8 +126,6 @@ export default function HomeClient() {
     selectedCategory,
     selectedSubcategory,
     inStockOnly,
-    minPrice,
-    maxPrice,
     currentPage,
     router,
   ]);
@@ -153,8 +141,6 @@ export default function HomeClient() {
     selectedCategory,
     selectedSubcategory,
     inStockOnly,
-    minPrice,
-    maxPrice,
     currentPage,
   ]);
 
@@ -171,8 +157,6 @@ export default function HomeClient() {
     selectedCategory,
     selectedSubcategory,
     inStockOnly,
-    minPrice,
-    maxPrice,
   ]);
 
   /* ---------- DERIVED ---------- */
@@ -275,27 +259,12 @@ export default function HomeClient() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
+            onFocus= {e => e.target.select()}
             placeholder="Search products…"
             className="w-full rounded border px-4 py-2"
           />
 
           <div className="flex flex-wrap gap-3">
-            <input
-              type="number"
-              placeholder="Min $"
-              value={minPrice}
-              onChange={e => setMinPrice(e.target.value)}
-              className="w-24 rounded border px-3 py-2"
-            />
-
-            <input
-              type="number"
-              placeholder="Max $"
-              value={maxPrice}
-              onChange={e => setMaxPrice(e.target.value)}
-              className="w-24 rounded border px-3 py-2"
-            />
-
             <select
               value={selectedCategory}
               onChange={e => {

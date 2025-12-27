@@ -15,12 +15,11 @@ export async function GET(req: Request) {
 
     const pool = await getPool();
 
-    /* ---------- SEARCH LOGIC ---------- */
+    /* ---------- SEARCH + FILTER LOGIC ---------- */
 
     const where: string[] = ["i.active = 1"];
     const params: Record<string, any> = { limit, offset };
 
-    // 🔴 SEARCH OVERRIDES FILTERS
     if (search) {
       const words = search
         .toLowerCase()
@@ -31,30 +30,28 @@ export async function GET(req: Request) {
         where.push(`LOWER(i.name) LIKE @w${index}`);
         params[`w${index}`] = `%${word}%`;
       });
-    } else {
-      // Only apply filters if NO search
-      if (subcategoryId) {
-        where.push("i.category_id = @subcategoryId");
-        params.subcategoryId = Number(subcategoryId);
-      } else if (categoryId) {
-        where.push(`
-          i.category_id IN (
-            SELECT id FROM categories WHERE parent_id = @categoryId
-            OR id = @categoryId
-          )
-        `);
-        params.categoryId = Number(categoryId);
-      }
-
-      if (inStockOnly) {
-        where.push("i.stock > 0");
-      }
     }
 
-    const whereClause =
-      where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    if (subcategoryId) {
+      where.push("i.category_id = @subcategoryId");
+      params.subcategoryId = Number(subcategoryId);
+    } else if (categoryId) {
+      where.push(`
+        i.category_id IN (
+          SELECT id FROM categories
+          WHERE parent_id = @categoryId OR id = @categoryId
+        )
+      `);
+      params.categoryId = Number(categoryId);
+    }
+
+    if (inStockOnly) {
+      where.push("i.stock > 0");
+    }
 
     /* ---------- COUNT ---------- */
+    const whereClause =
+      where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
 
     const countQuery = `
       SELECT COUNT(*) AS total
