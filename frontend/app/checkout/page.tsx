@@ -1,6 +1,6 @@
 "use client";
 
-import { useCart } from "@/context/CartContext";
+import { useCart } from "@/app/context/CartContext";
 import { apiRequest } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";

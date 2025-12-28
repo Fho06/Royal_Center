@@ -71,7 +71,7 @@ export async function GET(req: Request) {
 
 /* ===============================
    POST /api/orders
-   CREATE REAL ORDER (NO DRAFTS)
+   CREATE REAL ORDER
    =============================== */
 export async function POST(req: Request) {
   try {
@@ -147,14 +147,6 @@ export async function POST(req: Request) {
           .query(`
             INSERT INTO order_items (order_id, item_id, quantity, price)
             VALUES (@order_id, @item_id, @quantity, @price)
-          `);
-
-        await tx
-          .request()
-          .input("id", sql.VarChar, item.item_id)
-          .input("qty", sql.Int, item.quantity)
-          .query(`
-            UPDATE items SET stock = stock - @qty WHERE id = @id
           `);
       }
 

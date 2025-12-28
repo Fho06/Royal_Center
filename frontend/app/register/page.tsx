@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { apiRequest } from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -23,11 +25,14 @@ export default function RegisterPage() {
         }),
       });
 
-      router.push("/login");
+      const next = searchParams.get("next");
+      router.push(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
     } catch (err: any) {
       setError(err.message);
     }
   }
+
+  const next = searchParams.get("next");
 
   return (
     <div className="flex min-h-screen items-center justify-center">
@@ -66,7 +71,10 @@ export default function RegisterPage() {
 
         <p className="text-sm">
           Already have an account?{" "}
-          <a href="/login" className="underline">
+          <a
+            href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
+            className="underline"
+          >
             Go back to login
           </a>
         </p>

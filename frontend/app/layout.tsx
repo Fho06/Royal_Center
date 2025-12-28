@@ -1,5 +1,5 @@
 import "./globals.css";
-import { CartProvider } from "@/context/CartContext";
+import { CartProvider } from "@/app/context/CartContext";
 import { AuthProvider } from "@/app/context/AuthContext";
 import Navbar from "@/components/Navbar";
 
