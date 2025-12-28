@@ -11,6 +11,12 @@ type Params = {
   limit: number;
 };
 
+type UseItemsResult = {
+  items: Item[];
+  total: number;
+  error: string;
+};
+
 export function useItems({
   search,
   category,
@@ -18,8 +24,8 @@ export function useItems({
   inStockOnly,
   page,
   limit,
-}: Params) {
-  const [items, setItems] = useState([]);
+}: Params): UseItemsResult {
+  const [items, setItems] = useState<Item[]>([]);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
 
@@ -41,14 +47,7 @@ export function useItems({
         setTotal(Number(data.total) || 0);
       })
       .catch(err => setError(err.message));
-  }, [
-    search,
-    category,
-    subcategory,
-    inStockOnly,
-    page,
-    limit,
-  ]); // ✅ stable deps
+  }, [search, category, subcategory, inStockOnly, page, limit]);
 
   return { items, total, error };
 }
