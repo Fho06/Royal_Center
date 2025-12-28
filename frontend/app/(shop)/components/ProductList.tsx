@@ -1,5 +1,6 @@
 import { Item } from "../types";
 const IMAGE_BASE_URL = "https://pub-db262da1ef9140738af0ec8adade1c90.r2.dev/products";
+const IMAGE_EXTENSIONS = ["jpeg", "jpg", "webp", "png", "jfif", "HEIC"];
 
 
 type Props = {
@@ -24,15 +25,30 @@ export function ProductList({ items, remainingStock, addToCart }: Props) {
           >
             {/* PRODUCT IMAGE */}
             <img
-              src={getProductImageUrl(item.id)}
+              src={`${IMAGE_BASE_URL}/${item.id}/1.${IMAGE_EXTENSIONS[0]}`}
               alt={item.name}
               className="w-24 h-24 object-cover rounded"
               loading="lazy"
               onError={(e) => {
-                e.currentTarget.onerror = null; // Prevent infinite loop
-                e.currentTarget.src = "/placeholder.png";
+                const img = e.currentTarget as HTMLImageElement;
+
+                const currentSrc = img.src;
+                const currentExt = currentSrc.split(".").pop();
+                const currentIndex = IMAGE_EXTENSIONS.indexOf(currentExt || "");
+
+                // Try next extension
+                const nextExt = IMAGE_EXTENSIONS[currentIndex + 1];
+
+                if (nextExt) {
+                  img.src = `${IMAGE_BASE_URL}/${item.id}/1.${nextExt}`;
+                } else {
+                  // All failed → fallback
+                  img.onerror = null;
+                  img.src = "/placeholder.png";
+                }
               }}
             />
+
 
             {/* PRODUCT INFO */}
             <div className="flex-1 flex justify-between">
