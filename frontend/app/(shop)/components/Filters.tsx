@@ -10,6 +10,7 @@ type Props = {
   setSelectedCategory: (v: string) => void;
   selectedSubcategory: string;
   setSelectedSubcategory: (v: string) => void;
+  isAdmin: boolean;
 };
 
 export function Filters(props: Props) {
@@ -26,10 +27,13 @@ export function Filters(props: Props) {
       <input
         value={props.search}
         onChange={e => props.setSearch(e.target.value)}
-        placeholder="Search products…"
+        placeholder={
+          props.isAdmin
+            ? "Search by name or reference number…"
+            : "Search products…"
+        }
         className="w-full rounded border px-4 py-2"
       />
-
       <div className="flex gap-3">
         <select
           value={props.selectedCategory}
