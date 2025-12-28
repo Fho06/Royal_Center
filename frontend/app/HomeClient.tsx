@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/api";
-import { useCart } from "@/context/CartContext";
+import { useCart } from "@/app/context/CartContext";
 import { useSearchParams, useRouter } from "next/navigation";
 
 /* ---------- TYPES ---------- */
@@ -158,6 +158,16 @@ export default function HomeClient() {
     selectedSubcategory,
     inStockOnly,
   ]);
+  // Resets categories and subcategories when searching
+  useEffect(() => {
+    if (!hydrated) return;
+
+    if (search.trim() !== "") {
+      setSelectedCategory("all");
+      setSelectedSubcategory("all");
+    }
+  }, [hydrated, search]);
+
 
   /* ---------- DERIVED ---------- */
 
@@ -270,6 +280,7 @@ export default function HomeClient() {
               onChange={e => {
                 setSelectedCategory(e.target.value);
                 setSelectedSubcategory("all");
+                setSearch("");
               }}
               className="rounded border px-3 py-2"
             >
@@ -284,7 +295,10 @@ export default function HomeClient() {
             {subCategories.length > 0 && (
               <select
                 value={selectedSubcategory}
-                onChange={e => setSelectedSubcategory(e.target.value)}
+                onChange={e => {
+                  setSelectedSubcategory(e.target.value);
+                  setSearch("");
+                }}
                 className="rounded border px-3 py-2"
               >
                 <option value="all">All subcategories</option>

@@ -30,24 +30,27 @@ export async function GET(req: Request) {
         where.push(`LOWER(i.name) LIKE @w${index}`);
         params[`w${index}`] = `%${word}%`;
       });
-    }
-
-    if (subcategoryId) {
-      where.push("i.category_id = @subcategoryId");
-      params.subcategoryId = Number(subcategoryId);
-    } else if (categoryId) {
-      where.push(`
-        i.category_id IN (
-          SELECT id FROM categories
-          WHERE parent_id = @categoryId OR id = @categoryId
-        )
-      `);
-      params.categoryId = Number(categoryId);
+    } else {
+      // Categories ONLY apply when NOT searching
+      if (subcategoryId) {
+        where.push("i.category_id = @subcategoryId");
+        params.subcategoryId = Number(subcategoryId);
+      } else if (categoryId) {
+        where.push(`
+          i.category_id IN (
+            SELECT id FROM categories
+            WHERE parent_id = @categoryId OR id = @categoryId
+          )
+        `);
+        params.categoryId = Number(categoryId);
+      }
     }
 
     if (inStockOnly) {
       where.push("i.stock > 0");
     }
+    
+
 
     /* ---------- COUNT ---------- */
     const whereClause =

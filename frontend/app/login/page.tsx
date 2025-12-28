@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { saveToken } from "@/lib/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -25,8 +27,11 @@ export default function LoginPage() {
           password,
         }),
       });
+
       login(data.token);
-      router.push("/");
+
+      const next = searchParams.get("next");
+      router.push(next || "/");
     } catch (err: any) {
       setError(err.message);
     }
@@ -69,7 +74,7 @@ export default function LoginPage() {
 
         <p className="text-sm">
           Don’t have an account?{" "}
-          <a href="/register" className="underline">
+          <a href={`/register${searchParams.get("next") ? `?next=${encodeURIComponent(searchParams.get("next")!)}` : ""}`} className="underline">
             Sign up
           </a>
         </p>

@@ -8,6 +8,10 @@ export default function Navbar() {
 
   const isAdmin = user?.role === "admin";
 
+  function handleLogout() {
+    logout(); // ✅ cart intentionally preserved
+  }
+
   return (
     <nav className="flex items-center justify-between border-b p-4">
       <Link href="/" className="font-bold">
@@ -27,7 +31,7 @@ export default function Navbar() {
             )}
 
             <button
-              onClick={logout}
+              onClick={handleLogout}
               className="text-sm underline"
             >
               Logout
