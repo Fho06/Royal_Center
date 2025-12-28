@@ -88,20 +88,23 @@ export async function POST(req: Request) {
       );
     }
 
+    const TAX_RATE = 0.16;
+
     const pool = await getPool();
     const tx = new sql.Transaction(pool);
     await tx.begin();
 
     try {
-      let total = 0;
+      let subtotal = 0;
+      let taxAmount = 0;
 
-      // Validate stock + calculate total
+      // 1️⃣ Validate + calculate totals
       for (const item of items) {
         const res = await tx
           .request()
           .input("id", sql.VarChar, item.item_id)
           .query(`
-            SELECT price_usd, stock
+            SELECT price_usd, stock, is_tax_exempt
             FROM items
             WHERE id = @id
           `);
@@ -111,42 +114,90 @@ export async function POST(req: Request) {
         }
 
         const dbItem = res.recordset[0];
+
         if (item.quantity > dbItem.stock) {
           throw new Error("Insufficient stock");
         }
 
-        total += dbItem.price_usd * item.quantity;
+        const lineSubtotal = dbItem.price_usd * item.quantity;
+        subtotal += lineSubtotal;
+
+        if (!dbItem.is_tax_exempt) {
+          taxAmount += lineSubtotal * TAX_RATE;
+        }
       }
 
-      // Create real order
+      const totalAmount = subtotal + taxAmount;
+
+      // 2️⃣ Create order
       const orderRes = await tx
         .request()
         .input("user_id", sql.Int, user.userId)
-        .input("total", sql.Decimal(10, 2), total)
+        .input("subtotal", sql.Decimal(10, 2), subtotal)
+        .input("tax", sql.Decimal(10, 2), taxAmount)
+        .input("total", sql.Decimal(10, 2), totalAmount)
         .query(`
-          INSERT INTO orders (user_id, total_amount, status)
+          INSERT INTO orders (
+            user_id,
+            subtotal,
+            tax_amount,
+            total_amount,
+            status
+          )
           OUTPUT INSERTED.id
-          VALUES (@user_id, @total, 'pending_payment')
+          VALUES (
+            @user_id,
+            @subtotal,
+            @tax,
+            @total,
+            'pending_payment'
+          )
         `);
 
       const orderId = orderRes.recordset[0].id;
 
-      // Insert items + deduct stock
+      // 3️⃣ Snapshot order items
       for (const item of items) {
-        const priceRes = await tx
+        const itemRes = await tx
           .request()
           .input("id", sql.VarChar, item.item_id)
-          .query(`SELECT price_usd FROM items WHERE id = @id`);
+          .query(`
+            SELECT price_usd, is_tax_exempt
+            FROM items
+            WHERE id = @id
+          `);
+
+        const dbItem = itemRes.recordset[0];
 
         await tx
           .request()
           .input("order_id", sql.Int, orderId)
           .input("item_id", sql.VarChar, item.item_id)
           .input("quantity", sql.Int, item.quantity)
-          .input("price", sql.Decimal(10, 2), priceRes.recordset[0].price_usd)
+          .input("price", sql.Decimal(10, 2), dbItem.price_usd)
+          .input("is_tax_exempt", sql.Bit, dbItem.is_tax_exempt)
+          .input(
+            "tax_rate",
+            sql.Decimal(5, 4),
+            dbItem.is_tax_exempt ? 0 : TAX_RATE
+          )
           .query(`
-            INSERT INTO order_items (order_id, item_id, quantity, price)
-            VALUES (@order_id, @item_id, @quantity, @price)
+            INSERT INTO order_items (
+              order_id,
+              item_id,
+              quantity,
+              price,
+              is_tax_exempt,
+              tax_rate
+            )
+            VALUES (
+              @order_id,
+              @item_id,
+              @quantity,
+              @price,
+              @is_tax_exempt,
+              @tax_rate
+            )
           `);
       }
 
