@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Category } from "../types";
 
 type Props = {
@@ -21,6 +21,9 @@ export function Filters(props: Props) {
      LOCAL INPUT STATE
      ========================= */
   const [input, setInput] = useState(props.search);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const justFocused = useRef(false);
 
   // keep input in sync when search is changed externally
   useEffect(() => {
@@ -44,9 +47,28 @@ export function Filters(props: Props) {
   return (
     <>
       <input
+        ref={inputRef}
         value={input}
         onChange={e => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
+        onFocus={() => {
+          justFocused.current = true;
+          requestAnimationFrame(() => {
+            inputRef.current?.select();
+          });
+        }}
+        onMouseDown={e => {
+          // prevent cursor placement on first click
+          if (justFocused.current) {
+            e.preventDefault();
+          }
+        }}
+        onMouseUp={() => {
+          justFocused.current = false;
+        }}
+        onKeyUp={() => {
+          justFocused.current = false;
+        }}
         placeholder={
           props.isAdmin
             ? "Search by name or reference number…"
@@ -61,8 +83,8 @@ export function Filters(props: Props) {
           onChange={e => {
             props.setSelectedCategory(e.target.value);
             props.setSelectedSubcategory("all");
-            props.setSearch("");      // reset active search
-            setInput("");              // reset typed text
+            props.setSearch(""); // reset active search
+            setInput("");        // reset typed text
           }}
           className="rounded border px-3 py-2"
         >
