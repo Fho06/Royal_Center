@@ -34,35 +34,24 @@ export async function PUT(
   context: { params: Promise<{ slot: string; position: string }> }
 ) {
   try {
-    // 📦 body
     const body = await req.json();
     const { item_id } = body;
-    
+
     // 🔐 auth
     requireAdmin(req);
 
-    // 🔓 params (async in modern Next.js)
     const { slot: rawSlot, position: rawPosition } =
       await context.params;
 
     const slot = rawSlot.trim();
     const position = Number(rawPosition);
 
-    // 🧪 validate slot / position
     if (!ALLOWED_SLOTS.has(slot) || !isValidPosition(slot, position)) {
-      console.error("INVALID SLOT/POSITION", {
-        rawSlot,
-        slot,
-        position,
-      });
-
       return NextResponse.json(
         { error: "Invalid slot/position" },
         { status: 400 }
       );
     }
-
-
 
     if (!item_id) {
       return NextResponse.json(
@@ -73,7 +62,6 @@ export async function PUT(
 
     const pool = await getPool();
 
-    // 🔍 validate item exists
     const exists = await pool
       .request()
       .input("item_id", sql.VarChar, item_id)
@@ -90,7 +78,6 @@ export async function PUT(
       );
     }
 
-    // 🔁 upsert featured product
     await pool
       .request()
       .input("slot", sql.VarChar, slot)
@@ -121,6 +108,61 @@ export async function PUT(
     console.error("Featured PUT error:", err);
     return NextResponse.json(
       { error: "Failed to update featured product" },
+      { status: 500 }
+    );
+  }
+}
+
+/* =========================
+   DELETE /api/featured/:slot/:position
+   ========================= */
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ slot: string; position: string }> }
+) {
+  try {
+    // 🔐 auth
+    requireAdmin(req);
+
+    const { slot: rawSlot, position: rawPosition } =
+      await context.params;
+
+    const slot = rawSlot.trim();
+    const position = Number(rawPosition);
+
+    if (!ALLOWED_SLOTS.has(slot) || !isValidPosition(slot, position)) {
+      return NextResponse.json(
+        { error: "Invalid slot/position" },
+        { status: 400 }
+      );
+    }
+
+    const pool = await getPool();
+
+    await pool
+      .request()
+      .input("slot", sql.VarChar, slot)
+      .input("position", sql.Int, position)
+      .query(`
+        DELETE FROM featured_products
+        WHERE slot = @slot AND position = @position
+      `);
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    const msg = err?.message || "";
+
+    if (msg === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (msg === "Forbidden") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    console.error("Featured DELETE error:", err);
+    return NextResponse.json(
+      { error: "Failed to delete featured product" },
       { status: 500 }
     );
   }
