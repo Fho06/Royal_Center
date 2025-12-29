@@ -133,9 +133,7 @@ export default function HomeClient() {
       const existing = prev.find((c) => c.item_id === item.id);
       if (existing) {
         return prev.map((c) =>
-          c.item_id === item.id
-            ? { ...c, quantity: c.quantity + 1 }
-            : c
+          c.item_id === item.id ? { ...c, quantity: c.quantity + 1 } : c
         );
       }
       return [
@@ -171,7 +169,7 @@ export default function HomeClient() {
 
   const totalPrice = cart.reduce((sum, it) => sum + it.price * it.quantity, 0);
   const canIncrease = (id: string) =>
-    items.find((p) => p.id === id)?.stock! - cartQty(id) > 0;
+    (items.find((p) => p.id === id)?.stock ?? 0) - cartQty(id) > 0;
 
   /* =========================
      FEATURED
@@ -182,8 +180,14 @@ export default function HomeClient() {
   const [activePick, setActivePick] = useState<ActivePick>(null);
 
   async function loadFeatured() {
-    const res = await fetch("/api/featured", { cache: "no-store" });
+    // ✅ cache-bust GET so dev/HMR can't reuse a cached response
+    const bust = Date.now();
+    const res = await fetch(`/api/featured?bust=${bust}`, {
+      cache: "no-store",
+    });
+
     if (!res.ok) return;
+
     const data = await res.json();
     setFeatured(data.featured ?? {});
   }
@@ -206,14 +210,20 @@ export default function HomeClient() {
     const token = getToken();
     if (!token) return;
 
-    await fetch(`/api/featured/${slot}/${position}`, {
+    const res = await fetch(`/api/featured/${slot}/${position}`, {
       method: "PUT",
+      cache: "no-store",
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ item_id: itemId }),
     });
+
+    // Even if PUT fails, reload so UI reflects truth
+    if (!res.ok) {
+      // Optional: console.error(await res.text());
+    }
 
     await loadFeatured();
   }
@@ -222,10 +232,15 @@ export default function HomeClient() {
     const token = getToken();
     if (!token) return;
 
-    await fetch(`/api/featured/${slot}/${position}`, {
+    const res = await fetch(`/api/featured/${slot}/${position}`, {
       method: "DELETE",
+      cache: "no-store",
       headers: { authorization: `Bearer ${token}` },
     });
+
+    if (!res.ok) {
+      // Optional: console.error(await res.text());
+    }
 
     await loadFeatured();
   }
@@ -291,9 +306,7 @@ export default function HomeClient() {
         currentPage={currentPage}
         totalPages={totalPages}
         onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
-        onNext={() =>
-          setCurrentPage((p) => Math.min(totalPages, p + 1))
-        }
+        onNext={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
       />
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
@@ -308,11 +321,7 @@ export default function HomeClient() {
           onPick={async (item) => {
             if (!activePick) return;
             setModalOpen(false);
-            await assignFeatured(
-              activePick.slot,
-              activePick.position,
-              item.id
-            );
+            await assignFeatured(activePick.slot, activePick.position, item.id);
             setActivePick(null);
           }}
         />

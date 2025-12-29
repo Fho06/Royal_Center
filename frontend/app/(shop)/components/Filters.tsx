@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
 import { Category } from "../types";
 
 type Props = {
@@ -14,6 +17,19 @@ type Props = {
 };
 
 export function Filters(props: Props) {
+  /* =========================
+     LOCAL INPUT STATE
+     ========================= */
+  const [input, setInput] = useState(props.search);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const justFocused = useRef(false);
+
+  // keep input in sync when search is changed externally
+  useEffect(() => {
+    setInput(props.search);
+  }, [props.search]);
+
   const main = props.categories.filter(c => c.level === 1);
   const subs =
     props.selectedCategory === "all"
@@ -22,11 +38,37 @@ export function Filters(props: Props) {
           c => c.level === 2 && c.parent_id === Number(props.selectedCategory)
         );
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      props.setSearch(input.trim());
+    }
+  }
+
   return (
     <>
       <input
-        value={props.search}
-        onChange={e => props.setSearch(e.target.value)}
+        ref={inputRef}
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onFocus={() => {
+          justFocused.current = true;
+          requestAnimationFrame(() => {
+            inputRef.current?.select();
+          });
+        }}
+        onMouseDown={e => {
+          // prevent cursor placement on first click
+          if (justFocused.current) {
+            e.preventDefault();
+          }
+        }}
+        onMouseUp={() => {
+          justFocused.current = false;
+        }}
+        onKeyUp={() => {
+          justFocused.current = false;
+        }}
         placeholder={
           props.isAdmin
             ? "Search by name or reference number…"
@@ -34,13 +76,15 @@ export function Filters(props: Props) {
         }
         className="w-full rounded border px-4 py-2"
       />
+
       <div className="flex gap-3">
         <select
           value={props.selectedCategory}
           onChange={e => {
             props.setSelectedCategory(e.target.value);
             props.setSelectedSubcategory("all");
-            props.setSearch("");
+            props.setSearch(""); // reset active search
+            setInput("");        // reset typed text
           }}
           className="rounded border px-3 py-2"
         >
@@ -58,6 +102,7 @@ export function Filters(props: Props) {
             onChange={e => {
               props.setSelectedSubcategory(e.target.value);
               props.setSearch("");
+              setInput("");
             }}
             className="rounded border px-3 py-2"
           >
