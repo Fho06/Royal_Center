@@ -75,20 +75,40 @@ export async function GET(req: Request) {
 
           (
             CASE
-              -- STRONG textual matches
-              WHEN i.name LIKE '%' + @search + '%' THEN 160
-              WHEN i.name LIKE @search + '%' THEN 150
-              WHEN DIFFERENCE(i.name, @search) >= 3 THEN 110
+              /* =========================
+                STRONG TEXT MATCHES
+                ========================= */
+              WHEN i.name LIKE '%' + @search + '%' THEN 200
+              WHEN i.name LIKE @search + '%' THEN 180
+              WHEN i.name LIKE LEFT(@search, 4) + '%' THEN 160
 
-              -- SKU
-              WHEN i.id LIKE '%' + @search + '%' THEN 100
+              /* typo / phonetic, but still prefix-anchored */
+              WHEN
+                DIFFERENCE(i.name, @search) >= 3
+                AND i.name LIKE LEFT(@search, 4) + '%'
+              THEN 140
 
-              -- FILLERS (only influence ranking)
-              WHEN @subcategory_id IS NOT NULL AND i.category_id = @subcategory_id THEN 25
-              WHEN @category_id IS NOT NULL AND i.category_id IN (
-                SELECT id FROM categories
-                WHERE parent_id = @category_id OR id = @category_id
-              ) THEN 10
+              /* SKU */
+              WHEN i.id LIKE '%' + @search + '%' THEN 130
+
+              /* =========================
+                FILLERS (ONLY IF SEARCH IS WEAK)
+                ========================= */
+              WHEN
+                LEN(@search) <= 4
+                AND @subcategory_id IS NOT NULL
+                AND i.category_id = @subcategory_id
+              THEN 30
+
+              WHEN
+                LEN(@search) <= 4
+                AND @category_id IS NOT NULL
+                AND i.category_id IN (
+                  SELECT id
+                  FROM categories
+                  WHERE parent_id = @category_id OR id = @category_id
+                )
+              THEN 15
 
               ELSE 0
             END
@@ -99,10 +119,36 @@ export async function GET(req: Request) {
           i.active = 1
           AND (
             @search = ''
+
+            /* strong matches */
             OR i.name LIKE '%' + @search + '%'
             OR i.name LIKE @search + '%'
-            OR DIFFERENCE(i.name, @search) >= 3
+            OR i.name LIKE LEFT(@search, 4) + '%'
+
+            /* typo match (guarded by prefix) */
+            OR (
+              DIFFERENCE(i.name, @search) >= 3
+              AND i.name LIKE LEFT(@search, 4) + '%'
+            )
+
+            /* SKU */
             OR i.id LIKE '%' + @search + '%'
+
+            /* fillers allowed ONLY when search is short */
+            OR (
+              LEN(@search) <= 4
+              AND @subcategory_id IS NOT NULL
+              AND i.category_id = @subcategory_id
+            )
+            OR (
+              LEN(@search) <= 4
+              AND @category_id IS NOT NULL
+              AND i.category_id IN (
+                SELECT id
+                FROM categories
+                WHERE parent_id = @category_id OR id = @category_id
+              )
+            )
           )
           ${inStockOnly ? "AND i.stock > 0" : ""}
       ) ranked
