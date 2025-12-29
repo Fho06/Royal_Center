@@ -7,91 +7,112 @@ export async function GET(req: Request) {
 
     const limit = Number(searchParams.get("limit")) || 20;
     const offset = Number(searchParams.get("offset")) || 0;
-    const search = searchParams.get("search")?.trim();
 
-    const categoryId = searchParams.get("category_id");
-    const subcategoryId = searchParams.get("subcategory_id");
+    const search = searchParams.get("search")?.trim() ?? "";
+
+    const categoryId =
+      searchParams.get("category_id") && searchParams.get("category_id") !== "all"
+        ? Number(searchParams.get("category_id"))
+        : null;
+
+    const subcategoryId =
+      searchParams.get("subcategory_id") &&
+      searchParams.get("subcategory_id") !== "all"
+        ? Number(searchParams.get("subcategory_id"))
+        : null;
+
     const inStockOnly = searchParams.get("in_stock") === "1";
 
     const pool = await getPool();
 
-    /* ---------- SEARCH + FILTER LOGIC ---------- */
-
-    const where: string[] = ["i.active = 1"];
-    const params: Record<string, any> = { limit, offset };
-
-    if (search) {
-      const words = search
-        .toLowerCase()
-        .split(/\s+/)
-        .filter(Boolean);
-
-      words.forEach((word, index) => {
-        where.push(`LOWER(i.name) LIKE @w${index}`);
-        params[`w${index}`] = `%${word}%`;
-      });
-    } else {
-      // Categories ONLY apply when NOT searching
-      if (subcategoryId) {
-        where.push("i.category_id = @subcategoryId");
-        params.subcategoryId = Number(subcategoryId);
-      } else if (categoryId) {
-        where.push(`
-          i.category_id IN (
-            SELECT id FROM categories
-            WHERE parent_id = @categoryId OR id = @categoryId
-          )
-        `);
-        params.categoryId = Number(categoryId);
-      }
-    }
-
-    if (inStockOnly) {
-      where.push("i.stock > 0");
-    }
-    
-
-
-    /* ---------- COUNT ---------- */
-    const whereClause =
-      where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    /* =========================
+       COUNT QUERY (ELIGIBILITY ONLY)
+       ========================= */
+    const countReq = pool
+      .request()
+      .input("search", sql.NVarChar, search)
+      .input("category_id", sql.Int, categoryId)
+      .input("subcategory_id", sql.Int, subcategoryId);
 
     const countQuery = `
       SELECT COUNT(*) AS total
       FROM items i
-      ${whereClause}
+      WHERE
+        i.active = 1
+        AND (
+          @search = ''
+          OR i.name LIKE '%' + @search + '%'
+          OR i.name LIKE @search + '%'
+          OR DIFFERENCE(i.name, @search) >= 3
+          OR i.id LIKE '%' + @search + '%'
+        )
+        ${inStockOnly ? "AND i.stock > 0" : ""}
     `;
-
-    const countReq = pool.request();
-    Object.entries(params).forEach(([k, v]) => {
-      if (!["limit", "offset"].includes(k)) {
-        countReq.input(k, v);
-      }
-    });
 
     const countResult = await countReq.query(countQuery);
     const total = countResult.recordset[0].total;
 
-    /* ---------- DATA ---------- */
+    /* =========================
+       DATA QUERY (RANKING + FILLERS)
+       ========================= */
+    const dataReq = pool
+      .request()
+      .input("search", sql.NVarChar, search)
+      .input("category_id", sql.Int, categoryId)
+      .input("subcategory_id", sql.Int, subcategoryId)
+      .input("offset", sql.Int, offset)
+      .input("limit", sql.Int, limit);
 
     const dataQuery = `
-      SELECT
-        i.id,
-        i.name,
-        i.price_usd,
-        i.stock,
-        i.category_id
-      FROM items i
-      ${whereClause}
-      ORDER BY i.name
+      SELECT *
+      FROM (
+        SELECT
+          i.id,
+          i.name,
+          i.price_usd,
+          i.stock,
+          i.category_id,
+
+          (
+            CASE
+              -- STRONG textual matches
+              WHEN i.name LIKE '%' + @search + '%' THEN 160
+              WHEN i.name LIKE @search + '%' THEN 150
+              WHEN DIFFERENCE(i.name, @search) >= 3 THEN 110
+
+              -- SKU
+              WHEN i.id LIKE '%' + @search + '%' THEN 100
+
+              -- FILLERS (only influence ranking)
+              WHEN @subcategory_id IS NOT NULL AND i.category_id = @subcategory_id THEN 25
+              WHEN @category_id IS NOT NULL AND i.category_id IN (
+                SELECT id FROM categories
+                WHERE parent_id = @category_id OR id = @category_id
+              ) THEN 10
+
+              ELSE 0
+            END
+          ) AS relevance_score
+
+        FROM items i
+        WHERE
+          i.active = 1
+          AND (
+            @search = ''
+            OR i.name LIKE '%' + @search + '%'
+            OR i.name LIKE @search + '%'
+            OR DIFFERENCE(i.name, @search) >= 3
+            OR i.id LIKE '%' + @search + '%'
+          )
+          ${inStockOnly ? "AND i.stock > 0" : ""}
+      ) ranked
+      ORDER BY
+        ranked.relevance_score DESC,
+        ranked.stock DESC,
+        ranked.name
       OFFSET @offset ROWS
       FETCH NEXT @limit ROWS ONLY
     `;
-
-    const dataReq = pool.request();
-    Object.entries(params).forEach(([k, v]) => {
-      dataReq.input(k, v);
-    });
 
     const result = await dataReq.query(dataQuery);
 
