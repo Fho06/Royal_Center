@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCart } from "@/app/context/CartContext";
 import { useItems } from "./(shop)/hooks/UseItems";
-import { useCategories } from "./(shop)/hooks/UseCategories";
-import { Filters } from "./(shop)/components/Filters";
 import { ProductList } from "./(shop)/components/ProductList";
-import { CartSidebar } from "./(shop)/components/CartSidebar";
 import { Pagination } from "./(shop)/components/Pagination";
 import { useAuth } from "@/app/context/AuthContext";
 import { Item } from "./(shop)/types";
@@ -20,27 +17,15 @@ import { AdminProductSearchModal } from "./(shop)/components/AdminProductSearchM
 
 const ITEMS_PER_PAGE = 20;
 
-/* =========================
-   AUTH TOKEN
-   ========================= */
-
 function getToken() {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("token");
 }
 
-/* =========================
-   ACTIVE PICK
-   ========================= */
-
 type ActivePick = {
   slot: FeaturedSlot;
   position: 1 | 2 | 3 | 4;
 } | null;
-
-/* =========================
-   COMPONENT
-   ========================= */
 
 export default function HomeClient() {
   const router = useRouter();
@@ -52,72 +37,55 @@ export default function HomeClient() {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
 
-  /* ---------- FILTER STATE ---------- */
+  /* =========================
+     SEARCH / PAGINATION
+     ========================= */
   const [search, setSearch] = useState("");
-  const [inStockOnly, setInStockOnly] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedSubcategory, setSelectedSubcategory] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
 
-  /* ---------- URL → STATE ---------- */
   useEffect(() => {
     if (!hydrated) return;
     setSearch(searchParams.get("search") || "");
-    setInStockOnly(searchParams.get("in_stock") === "1");
-    setSelectedCategory(searchParams.get("category") || "all");
-    setSelectedSubcategory(searchParams.get("subcategory") || "all");
     setCurrentPage(Number(searchParams.get("page")) || 1);
   }, [hydrated, searchParams]);
 
-  /* ---------- STATE → URL ---------- */
   useEffect(() => {
     if (!hydrated) return;
 
     const url = new URL(window.location.href);
-    const set = (k: string, v: string | null) => {
-      if (!v || v === "all") url.searchParams.delete(k);
-      else url.searchParams.set(k, v);
-    };
 
-    set("search", search);
-    set("category", selectedCategory);
-    set("subcategory", selectedSubcategory);
-    set("in_stock", inStockOnly ? "1" : null);
-    set("page", currentPage.toString());
+    if (search) url.searchParams.set("search", search);
+    else url.searchParams.delete("search");
+
+    url.searchParams.set("page", currentPage.toString());
 
     router.replace(url.pathname + "?" + url.searchParams.toString(), {
       scroll: false,
     });
-  }, [
-    hydrated,
-    search,
-    selectedCategory,
-    selectedSubcategory,
-    inStockOnly,
-    currentPage,
-    router,
-  ]);
+  }, [hydrated, search, currentPage, router]);
 
   useEffect(() => {
     if (!hydrated) return;
     setCurrentPage(1);
-  }, [hydrated, search, selectedCategory, selectedSubcategory, inStockOnly]);
+  }, [hydrated, search]);
 
-  /* ---------- DATA ---------- */
-  const categories = useCategories();
-
+  /* =========================
+     DATA (compat with hook)
+     ========================= */
   const { items, total, error } = useItems({
     search,
-    category: selectedCategory,
-    subcategory: selectedSubcategory,
-    inStockOnly,
+    category: "all",
+    subcategory: "all",
+    inStockOnly: false,
     page: currentPage,
     limit: ITEMS_PER_PAGE,
   });
 
   const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
 
-  /* ---------- CART HELPERS ---------- */
+  /* =========================
+     CART HELPERS
+     ========================= */
   function cartQty(itemId: string) {
     return cart.find((c) => c.item_id === itemId)?.quantity || 0;
   }
@@ -167,27 +135,21 @@ export default function HomeClient() {
     );
   }
 
-  const totalPrice = cart.reduce((sum, it) => sum + it.price * it.quantity, 0);
   const canIncrease = (id: string) =>
     (items.find((p) => p.id === id)?.stock ?? 0) - cartQty(id) > 0;
 
   /* =========================
      FEATURED
      ========================= */
-
   const [featured, setFeatured] = useState<FeaturedMap>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [activePick, setActivePick] = useState<ActivePick>(null);
 
   async function loadFeatured() {
-    // ✅ cache-bust GET so dev/HMR can't reuse a cached response
-    const bust = Date.now();
-    const res = await fetch(`/api/featured?bust=${bust}`, {
+    const res = await fetch(`/api/featured?bust=${Date.now()}`, {
       cache: "no-store",
     });
-
     if (!res.ok) return;
-
     const data = await res.json();
     setFeatured(data.featured ?? {});
   }
@@ -197,11 +159,6 @@ export default function HomeClient() {
     loadFeatured();
   }, [hydrated]);
 
-  function openAdd(ref: ActivePick) {
-    setActivePick(ref);
-    setModalOpen(true);
-  }
-
   async function assignFeatured(
     slot: FeaturedSlot,
     position: number,
@@ -210,20 +167,14 @@ export default function HomeClient() {
     const token = getToken();
     if (!token) return;
 
-    const res = await fetch(`/api/featured/${slot}/${position}`, {
+    await fetch(`/api/featured/${slot}/${position}`, {
       method: "PUT",
-      cache: "no-store",
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ item_id: itemId }),
     });
-
-    // Even if PUT fails, reload so UI reflects truth
-    if (!res.ok) {
-      // Optional: console.error(await res.text());
-    }
 
     await loadFeatured();
   }
@@ -232,84 +183,63 @@ export default function HomeClient() {
     const token = getToken();
     if (!token) return;
 
-    const res = await fetch(`/api/featured/${slot}/${position}`, {
+    await fetch(`/api/featured/${slot}/${position}`, {
       method: "DELETE",
-      cache: "no-store",
       headers: { authorization: `Bearer ${token}` },
     });
-
-    if (!res.ok) {
-      // Optional: console.error(await res.text());
-    }
 
     await loadFeatured();
   }
 
+  const isSearching = search.trim().length > 0;
+
   /* =========================
      RENDER
      ========================= */
-
   return (
     <main className="p-6 space-y-6">
-      <FeaturedGrid
-        isAdmin={isAdmin}
-        featured={featured}
-        onAddClick={(slot, position) => openAdd({ slot, position })}
-        onRemoveClick={(slot, position) => removeFeatured(slot, position)}
-        cartQty={cartQty}
-        remainingStock={remainingStock}
-        addToCart={addToCart}
-        increaseQty={increaseQty}
-        decreaseQty={decreaseQty}
-        canIncrease={canIncrease}
-      />
-
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-3">
-          <Filters
-            search={search}
-            setSearch={setSearch}
-            inStockOnly={inStockOnly}
-            setInStockOnly={setInStockOnly}
-            categories={categories}
-            selectedCategory={selectedCategory}
-            setSelectedCategory={setSelectedCategory}
-            selectedSubcategory={selectedSubcategory}
-            setSelectedSubcategory={setSelectedSubcategory}
-            isAdmin={isAdmin}
-          />
-        </div>
-
-        <CartSidebar
-          cart={cart}
-          total={totalPrice}
-          increase={increaseQty}
-          decrease={decreaseQty}
-          remove={(id) =>
-            setCart((prev) => prev.filter((it) => it.item_id !== id))
-          }
+      {!isSearching && (
+        <FeaturedGrid
+          isAdmin={isAdmin}
+          featured={featured}
+          onAddClick={(slot, position) => {
+            setActivePick({ slot, position });
+            setModalOpen(true);
+          }}
+          onRemoveClick={removeFeatured}
+          cartQty={cartQty}
+          remainingStock={remainingStock}
+          addToCart={addToCart}
+          increaseQty={increaseQty}
+          decreaseQty={decreaseQty}
           canIncrease={canIncrease}
         />
-      </section>
+      )}
 
-      <ProductList
-        items={items}
-        cartQty={cartQty}
-        remainingStock={remainingStock}
-        addToCart={addToCart}
-        increaseQty={increaseQty}
-        decreaseQty={decreaseQty}
-        canIncrease={canIncrease}
-      />
+      {isSearching && (
+        <>
+          <ProductList
+            items={items}
+            cartQty={cartQty}
+            remainingStock={remainingStock}
+            addToCart={addToCart}
+            increaseQty={increaseQty}
+            decreaseQty={decreaseQty}
+            canIncrease={canIncrease}
+          />
 
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
-        onNext={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-      />
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            onNext={() =>
+              setCurrentPage((p) => Math.min(totalPages, p + 1))
+            }
+          />
 
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+        </>
+      )}
 
       {isAdmin && (
         <AdminProductSearchModal
@@ -321,7 +251,11 @@ export default function HomeClient() {
           onPick={async (item) => {
             if (!activePick) return;
             setModalOpen(false);
-            await assignFeatured(activePick.slot, activePick.position, item.id);
+            await assignFeatured(
+              activePick.slot,
+              activePick.position,
+              item.id
+            );
             setActivePick(null);
           }}
         />

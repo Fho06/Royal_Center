@@ -71,8 +71,8 @@ export function Filters(props: Props) {
         }}
         placeholder={
           props.isAdmin
-            ? "Search by name or reference number…"
-            : "Search products…"
+            ? "Buscar por nombre o número de referencia…"
+            : "Buscar productos…"
         }
         className="w-full rounded border px-4 py-2"
       />
