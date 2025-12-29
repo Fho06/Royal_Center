@@ -197,7 +197,7 @@ export default function HomeClient() {
      RENDER
      ========================= */
   return (
-    <main className="p-6 space-y-6">
+    <main className="px-20 p-6 space-y-6">
       {!isSearching && (
         <FeaturedGrid
           isAdmin={isAdmin}

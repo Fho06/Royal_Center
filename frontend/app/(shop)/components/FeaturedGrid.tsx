@@ -19,11 +19,6 @@ export type FeaturedMap = Partial<
   Record<FeaturedSlot, Partial<Record<number, Item>>>
 >;
 
-type TileRef = {
-  slot: FeaturedSlot;
-  position: 1 | 2 | 3 | 4;
-};
-
 /* =========================
    HELPERS
    ========================= */
@@ -33,14 +28,16 @@ function emptyBox(isAdmin: boolean, onAdd?: () => void) {
     return (
       <button
         onClick={onAdd}
-        className="h-full w-full rounded-2xl border border-dashed bg-white hover:bg-black/5 flex items-center justify-center"
+        className="w-full h-full rounded-2xl border border-dashed bg-white hover:bg-black/5 flex items-center justify-center"
       >
         <span className="text-2xl font-light text-gray-700">+</span>
       </button>
     );
   }
 
-  return <div className="h-full w-full rounded-2xl border bg-white/60" />;
+  return (
+    <div className="w-full h-full rounded-2xl border bg-white/60" />
+  );
 }
 
 function getItem(
@@ -88,11 +85,12 @@ export function FeaturedGrid({
   decreaseQty,
   canIncrease,
 }: Props) {
+  /* ---------- HERO TILE ---------- */
   const renderHero = (slot: FeaturedSlot) => {
     const item = getItem(featured, slot, 1);
 
     return (
-      <div className="h-[240px] md:h-[340px]">
+      <div className="aspect-square w-full">
         {item ? (
           <ProductTile
             item={item}
@@ -112,17 +110,18 @@ export function FeaturedGrid({
     );
   };
 
+  /* ---------- GROUP TILE (2x2) ---------- */
   const renderGroup = (slot: FeaturedSlot) => {
     const positions: (1 | 2 | 3 | 4)[] = [1, 2, 3, 4];
 
     return (
-      <div className="h-[240px] md:h-[340px] rounded-2xl border border-dashed p-3">
-        <div className="grid grid-cols-2 grid-rows-2 gap-3 h-full">
+      <div className="aspect-square w-full rounded-2xl border border-dashed p-3">
+        <div className="grid grid-cols-2 grid-rows-2 gap-3 w-full h-full">
           {positions.map((pos) => {
             const item = getItem(featured, slot, pos);
 
             return (
-              <div key={pos} className="h-full">
+              <div key={pos} className="aspect-square w-full">
                 {item ? (
                   <ProductTile
                     item={item}
@@ -148,10 +147,17 @@ export function FeaturedGrid({
     );
   };
 
+  /* =========================
+     RENDER
+     ========================= */
+
   return (
     <section className="space-y-3">
       <div className="flex items-end justify-between">
-        <h2 className="text-xl font-semibold">Productos destacados</h2>
+        <h2 className="text-xl font-semibold">
+          Productos destacados
+        </h2>
+
         {isAdmin && (
           <p className="text-xs text-gray-500">
             Admin: usa “+” para asignar productos.
