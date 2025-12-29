@@ -12,6 +12,35 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@keyframes cart-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-cart-in {
+  animation: cart-in 0.18s ease-out;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out;
+}
+
+
 body {
   background: var(--background);
   color: var(--foreground);
