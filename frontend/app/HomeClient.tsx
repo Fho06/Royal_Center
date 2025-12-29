@@ -3,15 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCart } from "@/app/context/CartContext";
-
 import { useItems } from "./(shop)/hooks/UseItems";
 import { useCategories } from "./(shop)/hooks/UseCategories";
-
 import { Filters } from "./(shop)/components/Filters";
 import { ProductList } from "./(shop)/components/ProductList";
 import { CartSidebar } from "./(shop)/components/CartSidebar";
 import { Pagination } from "./(shop)/components/Pagination";
-
+import { useAuth } from "@/app/context/AuthContext";
 import { Item } from "./(shop)/types";
 
 /* ---------- CONSTANTS ---------- */
@@ -24,6 +22,8 @@ export default function HomeClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { cart, setCart } = useCart();
+  const user = useAuth().user;
+  const isAdmin = user?.role === "admin";
 
   /* ---------- HYDRATION ---------- */
 
@@ -193,6 +193,7 @@ export default function HomeClient() {
             setSelectedCategory={setSelectedCategory}
             selectedSubcategory={selectedSubcategory}
             setSelectedSubcategory={setSelectedSubcategory}
+            isAdmin={isAdmin}
           />
         </div>
 
