@@ -17,7 +17,7 @@ import {
 import { AdminProductSearchModal } from "./(shop)/components/AdminProductSearchModal";
 import { SearchFilters } from "./(shop)/components/SearchFilters";
 
-const ITEMS_PER_PAGE = 18;
+const ITEMS_PER_PAGE = 20;
 
 function getToken() {
   if (typeof window === "undefined") return null;
@@ -254,86 +254,94 @@ export default function HomeClient() {
   /* =========================
      RENDER
      ========================= */
+     //px = mobile, md = tablet, lg = desktop
   return (
-    <main className="px-16 py-6 space-y-6">
-      {!isSearching && (
-        <FeaturedGrid
-          isAdmin={isAdmin}
-          featured={featured}
-          onAddClick={(slot, position) => {
-            setActivePick({ slot, position });
-            setModalOpen(true);
-          }}
-          onRemoveClick={removeFeatured}
-          cartQty={cartQty}
-          remainingStock={remainingStock}
-          addToCart={addToCart}
-          increaseQty={increaseQty}
-          decreaseQty={decreaseQty}
-          canIncrease={canIncrease}
-        />
-      )}
-
-      {isSearching && (
-        <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
-          <SearchFilters
-            facets={facets}
-            priceBounds={priceBounds}
-            priceRange={priceRange}
-            setPriceRange={setPriceRange}
-            categoryIds={categoryIds}
-            setCategoryIds={setCategoryIds}
-            subcategoryIds={subcategoryIds}
-            setSubcategoryIds={setSubcategoryIds}
-            inStockOnly={inStockOnly}
-            setInStockOnly={setInStockOnly}
-          />
-
-          <div className="space-y-4">
-            <ProductList
-              items={items}
+    <div className="overflow-x-hidden">
+      <div className="min-w-[1024px]">
+        <main className="px-4 md:px-12 lg:px-20 py-6 space-y-6">
+          {!isSearching && (
+            <FeaturedGrid
+              isAdmin={isAdmin}
+              featured={featured}
+              onAddClick={(slot, position) => {
+                setActivePick({ slot, position });
+                setModalOpen(true);
+              }}
+              onRemoveClick={removeFeatured}
               cartQty={cartQty}
               remainingStock={remainingStock}
               addToCart={addToCart}
               increaseQty={increaseQty}
               decreaseQty={decreaseQty}
               canIncrease={canIncrease}
-              variant="search"
             />
+          )}
 
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              onNext={() =>
-                setCurrentPage((p) => Math.min(totalPages, p + 1))
-              }
+          {isSearching && (
+            <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
+              <SearchFilters
+                facets={facets}
+                priceBounds={priceBounds}
+                priceRange={priceRange}
+                setPriceRange={setPriceRange}
+                categoryIds={categoryIds}
+                setCategoryIds={setCategoryIds}
+                subcategoryIds={subcategoryIds}
+                setSubcategoryIds={setSubcategoryIds}
+                inStockOnly={inStockOnly}
+                setInStockOnly={setInStockOnly}
+              />
+
+              <div className="space-y-4">
+                <h2 className="pt-1 pb-7 text-2xl font-semibold">
+                  Resultados
+                </h2> 
+                <ProductList
+                  items={items}
+                  cartQty={cartQty}
+                  remainingStock={remainingStock}
+                  addToCart={addToCart}
+                  increaseQty={increaseQty}
+                  decreaseQty={decreaseQty}
+                  canIncrease={canIncrease}
+                  variant="search"
+                />
+
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  onNext={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                />
+
+                {error && <p className="text-red-600 text-sm">{error}</p>}
+              </div>
+            </div>
+          )}
+
+          {isAdmin && (
+            <AdminProductSearchModal
+              open={modalOpen}
+              onClose={() => {
+                setModalOpen(false);
+                setActivePick(null);
+              }}
+              onPick={async (item) => {
+                if (!activePick) return;
+                setModalOpen(false);
+                await assignFeatured(
+                  activePick.slot,
+                  activePick.position,
+                  item.id
+                );
+                setActivePick(null);
+              }}
             />
-
-            {error && <p className="text-red-600 text-sm">{error}</p>}
-          </div>
-        </div>
-      )}
-
-      {isAdmin && (
-        <AdminProductSearchModal
-          open={modalOpen}
-          onClose={() => {
-            setModalOpen(false);
-            setActivePick(null);
-          }}
-          onPick={async (item) => {
-            if (!activePick) return;
-            setModalOpen(false);
-            await assignFeatured(
-              activePick.slot,
-              activePick.position,
-              item.id
-            );
-            setActivePick(null);
-          }}
-        />
-      )}
-    </main>
+          )}
+        </main>
+      </div>
+    </div>
   );
 }

@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
     const pool = await getPool();
 
     /* ======================================================
-       DATA QUERY — PRIMARY + FILLER (UNCHANGED)
+       DATA QUERY — PRIMARY + FILLER
+       (Fix: exact-match boost + length tie-break; output unchanged)
        ====================================================== */
     const dataReq = pool
       .request()
@@ -41,7 +42,8 @@ export async function GET(req: NextRequest) {
       .input("category_ids", sql.NVarChar, categoryIds);
 
     const dataQuery = `
-      SELECT *
+      SELECT
+        id, name, price_usd, stock, category_id
       FROM (
         SELECT
           i.id,
@@ -49,16 +51,39 @@ export async function GET(req: NextRequest) {
           i.price_usd,
           i.stock,
           i.category_id,
+
+          /* ===========
+             RELEVANCE
+             - Exact match boost (highest)
+             - Starts-with beats contains
+             - Word-boundary beats contains
+             =========== */
           CASE
+            WHEN i.name = @search THEN 400
+
+            WHEN i.name LIKE @search + '%' THEN 300
+
+            WHEN i.name LIKE @search + ' %'
+              OR i.name LIKE '% ' + @search + '%'
+            THEN 260
+
             WHEN i.name LIKE '%' + @search + '%' THEN 220
-            WHEN i.name LIKE @search + '%' THEN 200
-            WHEN i.name LIKE LEFT(@search, 4) + '%' THEN 180
+
             WHEN DIFFERENCE(i.name, @search) >= 3
               AND i.name LIKE LEFT(@search, 4) + '%'
             THEN 165
+
             WHEN i.id LIKE '%' + @search + '%' THEN 140
+
             ELSE 0
           END AS relevance_score,
+
+          /* ===========
+             TIE-BREAK HELPERS (not returned)
+             Amazon-style: shorter titles win when relevance ties
+             =========== */
+          LEN(i.name) AS name_len,
+
           1 AS sort_group
         FROM items i
         WHERE
@@ -95,6 +120,9 @@ export async function GET(req: NextRequest) {
 
         UNION ALL
 
+        /* ===========
+           FILLER RESULTS (kept exactly as your logic)
+           =========== */
         SELECT
           i.id,
           i.name,
@@ -102,6 +130,7 @@ export async function GET(req: NextRequest) {
           i.stock,
           i.category_id,
           0 AS relevance_score,
+          LEN(i.name) AS name_len,
           2 AS sort_group
         FROM items i
         WHERE
@@ -142,6 +171,7 @@ export async function GET(req: NextRequest) {
       ORDER BY
         sort_group ASC,
         relevance_score DESC,
+        name_len ASC,      -- ✅ Amazon-style: shorter titles first when relevance ties
         stock DESC,
         name
       OFFSET @offset ROWS
@@ -177,11 +207,10 @@ export async function GET(req: NextRequest) {
         AND (@max_price IS NULL OR i.price_usd <= @max_price)
     `;
 
-    const total =
-      (await countReq.query(countQuery)).recordset[0].total;
+    const total = (await countReq.query(countQuery)).recordset[0].total;
 
     /* ======================================================
-       PRICE BOUNDS (NO PRICE FILTERS — FIXED)
+       PRICE BOUNDS (UNCHANGED)
        ====================================================== */
     const boundsReq = pool
       .request()
@@ -205,12 +234,12 @@ export async function GET(req: NextRequest) {
         )
     `;
 
-    const bounds =
-      (await boundsReq.query(boundsQuery)).recordset[0];
+    const bounds = (await boundsReq.query(boundsQuery)).recordset[0];
 
     /* ======================================================
-      FACETS — FIRST 3 PAGES, SAME FILTERS
-      ====================================================== */
+       FACETS — FIRST 3 PAGES, SAME FILTERS
+       (Fix: same relevance + length tie-break)
+       ====================================================== */
     const facetsReq = pool
       .request()
       .input("search", sql.NVarChar, search)
@@ -228,15 +257,19 @@ export async function GET(req: NextRequest) {
         SELECT TOP (@facet_limit)
           i.category_id,
           CASE
+            WHEN i.name = @search THEN 400
+            WHEN i.name LIKE @search + '%' THEN 300
+            WHEN i.name LIKE @search + ' %'
+              OR i.name LIKE '% ' + @search + '%'
+            THEN 260
             WHEN i.name LIKE '%' + @search + '%' THEN 220
-            WHEN i.name LIKE @search + '%' THEN 200
-            WHEN i.name LIKE LEFT(@search, 4) + '%' THEN 180
             WHEN DIFFERENCE(i.name, @search) >= 3
               AND i.name LIKE LEFT(@search, 4) + '%'
             THEN 165
             WHEN i.id LIKE '%' + @search + '%' THEN 140
             ELSE 0
           END AS relevance_score,
+          LEN(i.name) AS name_len,
           i.stock,
           i.name
         FROM items i
@@ -272,6 +305,7 @@ export async function GET(req: NextRequest) {
           )
         ORDER BY
           relevance_score DESC,
+          name_len ASC,      -- ✅ shorter titles first when relevance ties
           i.stock DESC,
           i.name
       ) i
@@ -281,8 +315,8 @@ export async function GET(req: NextRequest) {
     const facetRows = (await facetsReq.query(facetsQuery)).recordset;
 
     const facets = {
-      categories: [...new Set(facetRows.map(r => r.category_id).filter(Boolean))],
-      subcategories: [...new Set(facetRows.map(r => r.subcategory_id))]
+      categories: [...new Set(facetRows.map((r: any) => r.category_id).filter(Boolean))],
+      subcategories: [...new Set(facetRows.map((r: any) => r.subcategory_id))],
     };
 
     return NextResponse.json({
@@ -296,9 +330,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     console.error("Items error:", err);
-    return NextResponse.json(
-      { error: "Failed to fetch items" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch items" }, { status: 500 });
   }
 }
