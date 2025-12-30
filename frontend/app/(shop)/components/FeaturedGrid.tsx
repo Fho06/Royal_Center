@@ -100,6 +100,7 @@ export function FeaturedGrid({
             increaseQty={increaseQty}
             decreaseQty={decreaseQty}
             canIncrease={canIncrease}
+            variant="featured"
             showRemove={isAdmin}
             onRemove={() => onRemoveClick(slot, 1)}
           />
@@ -110,12 +111,13 @@ export function FeaturedGrid({
     );
   };
 
+
   /* ---------- GROUP TILE (2x2) ---------- */
   const renderGroup = (slot: FeaturedSlot) => {
     const positions: (1 | 2 | 3 | 4)[] = [1, 2, 3, 4];
 
     return (
-      <div className="aspect-square w-full rounded-2xl border border-dashed p-3">
+      <div className="aspect-square w-full">
         <div className="grid grid-cols-2 grid-rows-2 gap-3 w-full h-full">
           {positions.map((pos) => {
             const item = getItem(featured, slot, pos);
@@ -131,13 +133,12 @@ export function FeaturedGrid({
                     increaseQty={increaseQty}
                     decreaseQty={decreaseQty}
                     canIncrease={canIncrease}
+                    variant="featured"
                     showRemove={isAdmin}
                     onRemove={() => onRemoveClick(slot, pos)}
                   />
                 ) : (
-                  emptyBox(isAdmin, () =>
-                    onAddClick(slot, pos)
-                  )
+                  emptyBox(isAdmin, () => onAddClick(slot, pos))
                 )}
               </div>
             );
@@ -146,6 +147,7 @@ export function FeaturedGrid({
       </div>
     );
   };
+
 
   /* =========================
      RENDER

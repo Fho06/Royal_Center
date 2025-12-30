@@ -23,10 +23,7 @@ function loadLocalHistory(): string[] {
 }
 
 function saveLocalHistory(items: string[]) {
-  localStorage.setItem(
-    LOCAL_HISTORY_KEY,
-    JSON.stringify(items.slice(0, 8))
-  );
+  localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(items.slice(0, 8)));
 }
 
 function getToken() {
@@ -45,6 +42,14 @@ export default function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
   const isAdmin = user?.role === "admin";
   const { cart, setCart } = useCart();
+
+  /* =========================
+     MOUNTED GUARD (🔥 FIX)
+     ========================= */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   /* =========================
      SEARCH STATE
@@ -80,8 +85,9 @@ export default function Navbar() {
       }
     }
 
-    load();
-  }, [isAuthenticated]);
+    // only run on client after mount (localStorage)
+    if (mounted) load();
+  }, [isAuthenticated, mounted]);
 
   /* =========================
      SUBMIT SEARCH
@@ -105,12 +111,7 @@ export default function Navbar() {
         body: JSON.stringify({ query: q }),
       });
     } else {
-      const next = [
-        q,
-        ...history.filter(
-          (h) => h.toLowerCase() !== q.toLowerCase()
-        ),
-      ];
+      const next = [q, ...history.filter((h) => h.toLowerCase() !== q.toLowerCase())];
       saveLocalHistory(next);
       setHistory(next.slice(0, 8));
     }
@@ -131,9 +132,7 @@ export default function Navbar() {
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveIndex((i) =>
-        Math.min(i + 1, history.length - 1)
-      );
+      setActiveIndex((i) => Math.min(i + 1, history.length - 1));
     }
 
     if (e.key === "ArrowUp") {
@@ -143,9 +142,7 @@ export default function Navbar() {
 
     if (e.key === "Enter") {
       e.preventDefault();
-      submitSearch(
-        activeIndex >= 0 ? history[activeIndex] : search
-      );
+      submitSearch(activeIndex >= 0 ? history[activeIndex] : search);
     }
 
     if (e.key === "Escape") {
@@ -158,13 +155,10 @@ export default function Navbar() {
     const token = getToken();
 
     if (token) {
-      await fetch(
-        `/api/search-history/${encodeURIComponent(item)}`,
-        {
-          method: "DELETE",
-          headers: { authorization: `Bearer ${token}` },
-        }
-      );
+      await fetch(`/api/search-history/${encodeURIComponent(item)}`, {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${token}` },
+      });
     }
 
     const next = history.filter((h) => h !== item);
@@ -189,14 +183,16 @@ export default function Navbar() {
     }, 150);
   }
 
-  const total = cart.reduce(
-    (sum, it) => sum + it.price * it.quantity,
-    0
-  );
+  const total = cart.reduce((sum, it) => sum + it.price * it.quantity, 0);
 
   function handleLogout() {
     logout();
   }
+
+  /* =========================
+     IMPORTANT: mounted guard AFTER hooks
+     ========================= */
+  if (!mounted) return null;
 
   /* =========================
      RENDER
@@ -206,10 +202,7 @@ export default function Navbar() {
     <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b">
       <div className="flex flex-wrap lg:flex-nowrap items-center gap-6 px-6 py-4">
         {/* LEFT */}
-        <Link
-          href="/"
-          className="text-2xl font-serif whitespace-nowrap order-1"
-        >
+        <Link href="/" className="text-2xl font-serif whitespace-nowrap order-1 pl-5 pr-20">
           Royal Center
         </Link>
 
@@ -221,9 +214,7 @@ export default function Navbar() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onFocus={() => setShowHistory(true)}
-              onBlur={() =>
-                setTimeout(() => setShowHistory(false), 150)
-              }
+              onBlur={() => setTimeout(() => setShowHistory(false), 150)}
               onKeyDown={handleKeyDown}
               placeholder="Buscar productos..."
               className="w-full px-4 py-2 rounded-l-lg bg-white/60 border border-r-0 focus:outline-none"
@@ -233,12 +224,7 @@ export default function Navbar() {
               onClick={() => submitSearch(search)}
               className="px-4 rounded-r-lg bg-[#A9A9A9] hover:bg-[#808080] border"
             >
-              <Image
-                src="/search.png"
-                alt="Search"
-                width={18}
-                height={18}
-              />
+              <Image src="/search.png" alt="Search" width={18} height={18} />
             </button>
           </div>
 
@@ -277,9 +263,7 @@ export default function Navbar() {
               {isAdmin && (
                 <>
                   <Link href="/admin/orders">Admin Orders</Link>
-                  <Link href="/admin/payments">
-                    Admin Payments
-                  </Link>
+                  <Link href="/admin/payments">Admin Payments</Link>
                 </>
               )}
               <button onClick={handleLogout}>Salir</button>
@@ -289,15 +273,8 @@ export default function Navbar() {
           )}
 
           {/* CART */}
-          <div
-            className="relative"
-            onMouseEnter={openCart}
-            onMouseLeave={closeCart}
-          >
-            <button
-              onClick={() => router.push("/checkout")}
-              className="relative w-10 h-10"
-            >
+          <div className="relative" onMouseEnter={openCart} onMouseLeave={closeCart}>
+            <button onClick={() => router.push("/checkout")} className="relative w-10 h-10">
               <Image src="/cart.webp" alt="Cart" fill />
               {cart.length > 0 && (
                 <span className="absolute -top-2 -right-2 bg-black text-white text-xs rounded-full px-1">
@@ -316,23 +293,12 @@ export default function Navbar() {
                     setCart((prev) =>
                       prev
                         .map((it) =>
-                          it.item_id === id
-                            ? {
-                                ...it,
-                                quantity: it.quantity - 1,
-                              }
-                            : it
+                          it.item_id === id ? { ...it, quantity: it.quantity - 1 } : it
                         )
                         .filter((it) => it.quantity > 0)
                     )
                   }
-                  remove={(id) =>
-                    setCart((prev) =>
-                      prev.filter(
-                        (it) => it.item_id !== id
-                      )
-                    )
-                  }
+                  remove={(id) => setCart((prev) => prev.filter((it) => it.item_id !== id))}
                   canIncrease={() => true}
                 />
               </div>

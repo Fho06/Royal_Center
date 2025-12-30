@@ -4,29 +4,38 @@ import { Item } from "../types";
 
 type Params = {
   search: string;
-  category: string;
-  subcategory: string;
+  categoryIds?: number[];
+  subcategoryIds?: number[];
   inStockOnly: boolean;
+  priceRange?: [number, number] | null;
   page: number;
   limit: number;
 };
 
-type UseItemsResult = {
-  items: Item[];
-  total: number;
-  error: string;
+type Facets = {
+  categories: number[];
+  subcategories: number[];
+};
+
+type PriceBounds = {
+  min: number | null;
+  max: number | null;
 };
 
 export function useItems({
   search,
-  category,
-  subcategory,
+  categoryIds = [],
+  subcategoryIds = [],
   inStockOnly,
+  priceRange,
   page,
   limit,
-}: Params): UseItemsResult {
+}: Params) {
   const [items, setItems] = useState<Item[]>([]);
   const [total, setTotal] = useState(0);
+  const [facets, setFacets] = useState<Facets | null>(null);
+  const [priceBounds, setPriceBounds] =
+    useState<PriceBounds | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -37,17 +46,36 @@ export function useItems({
 
     if (search) qs.set("search", search);
     if (inStockOnly) qs.set("in_stock", "1");
+    if (categoryIds.length)
+      qs.set("category_ids", categoryIds.join(","));
+    if (subcategoryIds.length)
+      qs.set("subcategory_ids", subcategoryIds.join(","));
+    if (priceRange) {
+      qs.set("price_min", priceRange[0].toString());
+      qs.set("price_max", priceRange[1].toString());
+    }
 
-    if (subcategory !== "all") qs.set("subcategory_id", subcategory);
-    else if (category !== "all") qs.set("category_id", category);
-
-    apiRequest(`/items?${qs}`)
-      .then(data => {
-        setItems(Array.isArray(data.items) ? data.items : []);
-        setTotal(Number(data.total) || 0);
+    apiRequest(`/items?${qs.toString()}`)
+      .then((data) => {
+        setItems(data.items || []);
+        setTotal(data.total || 0);
+        setFacets(data.facets || null);        // ✅ THIS WAS MISSING
+        setPriceBounds(data.priceBounds || null);
+        setError("");
       })
-      .catch(err => setError(err.message));
-  }, [search, category, subcategory, inStockOnly, page, limit]);
+      .catch((err) =>
+        setError(err.message || "Failed to load items")
+      );
+  }, [
+    search,
+    categoryIds.join(","),
+    subcategoryIds.join(","),
+    inStockOnly,
+    priceRange?.[0],
+    priceRange?.[1],
+    page,
+    limit,
+  ]);
 
-  return { items, total, error };
+  return { items, total, facets, priceBounds, error };
 }

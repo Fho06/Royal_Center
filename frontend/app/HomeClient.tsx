@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCart } from "@/app/context/CartContext";
 import { useItems } from "./(shop)/hooks/UseItems";
+import { useCategories } from "./(shop)/hooks/UseCategories";
 import { ProductList } from "./(shop)/components/ProductList";
 import { Pagination } from "./(shop)/components/Pagination";
 import { useAuth } from "@/app/context/AuthContext";
@@ -14,8 +15,9 @@ import {
   type FeaturedSlot,
 } from "./(shop)/components/FeaturedGrid";
 import { AdminProductSearchModal } from "./(shop)/components/AdminProductSearchModal";
+import { SearchFilters } from "./(shop)/components/SearchFilters";
 
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 18;
 
 function getToken() {
   if (typeof window === "undefined") return null;
@@ -31,7 +33,7 @@ export default function HomeClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { cart, setCart } = useCart();
-  const user = useAuth().user;
+  const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
   const [hydrated, setHydrated] = useState(false);
@@ -43,12 +45,26 @@ export default function HomeClient() {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
+  /* =========================
+     FILTER STATE (SEARCH ONLY)
+     ========================= */
+  const [categoryIds, setCategoryIds] = useState<number[]>([]);
+  const [subcategoryIds, setSubcategoryIds] = useState<number[]>([]);
+  const [inStockOnly, setInStockOnly] = useState(true);
+  const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
+
+  /* =========================
+     URL → STATE
+     ========================= */
   useEffect(() => {
     if (!hydrated) return;
     setSearch(searchParams.get("search") || "");
     setCurrentPage(Number(searchParams.get("page")) || 1);
   }, [hydrated, searchParams]);
 
+  /* =========================
+     STATE → URL
+     ========================= */
   useEffect(() => {
     if (!hydrated) return;
 
@@ -64,24 +80,66 @@ export default function HomeClient() {
     });
   }, [hydrated, search, currentPage, router]);
 
+  /* =========================
+     RESET FILTERS ON NEW SEARCH
+     ========================= */
   useEffect(() => {
     if (!hydrated) return;
+
+    setCategoryIds([]);
+    setSubcategoryIds([]);
+    setPriceRange(null);
+    setInStockOnly(true);
     setCurrentPage(1);
   }, [hydrated, search]);
 
   /* =========================
-     DATA (compat with hook)
+     DATA
      ========================= */
-  const { items, total, error } = useItems({
+  const { items, total, priceBounds, error } = useItems({
     search,
-    category: "all",
-    subcategory: "all",
-    inStockOnly: false,
+    categoryIds,
+    subcategoryIds,
+    inStockOnly,
+    priceRange,
     page: currentPage,
     limit: ITEMS_PER_PAGE,
   });
 
   const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+
+  /* =========================
+     FACETS (CRITICAL FIX)
+     ========================= */
+  const categories = useCategories();
+
+  const facets = useMemo(() => {
+    if (!items.length || !categories.length) return null;
+
+    const subIds = new Set<number>();
+    const catIds = new Set<number>();
+
+    for (const item of items) {
+      if (item.category_id != null) {
+        subIds.add(item.category_id);
+      }
+    }
+
+    for (const c of categories) {
+      if (
+        c.level === 2 &&
+        subIds.has(c.id) &&
+        c.parent_id != null
+      ) {
+        catIds.add(c.parent_id);
+      }
+    }
+
+    return {
+      categories: Array.from(catIds),
+      subcategories: Array.from(subIds),
+    };
+  }, [items, categories]);
 
   /* =========================
      CART HELPERS
@@ -197,7 +255,7 @@ export default function HomeClient() {
      RENDER
      ========================= */
   return (
-    <main className="px-20 p-6 space-y-6">
+    <main className="px-16 py-6 space-y-6">
       {!isSearching && (
         <FeaturedGrid
           isAdmin={isAdmin}
@@ -217,28 +275,44 @@ export default function HomeClient() {
       )}
 
       {isSearching && (
-        <>
-          <ProductList
-            items={items}
-            cartQty={cartQty}
-            remainingStock={remainingStock}
-            addToCart={addToCart}
-            increaseQty={increaseQty}
-            decreaseQty={decreaseQty}
-            canIncrease={canIncrease}
+        <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
+          <SearchFilters
+            facets={facets}
+            priceBounds={priceBounds}
+            priceRange={priceRange}
+            setPriceRange={setPriceRange}
+            categoryIds={categoryIds}
+            setCategoryIds={setCategoryIds}
+            subcategoryIds={subcategoryIds}
+            setSubcategoryIds={setSubcategoryIds}
+            inStockOnly={inStockOnly}
+            setInStockOnly={setInStockOnly}
           />
 
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            onNext={() =>
-              setCurrentPage((p) => Math.min(totalPages, p + 1))
-            }
-          />
+          <div className="space-y-4">
+            <ProductList
+              items={items}
+              cartQty={cartQty}
+              remainingStock={remainingStock}
+              addToCart={addToCart}
+              increaseQty={increaseQty}
+              decreaseQty={decreaseQty}
+              canIncrease={canIncrease}
+              variant="search"
+            />
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-        </>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onNext={() =>
+                setCurrentPage((p) => Math.min(totalPages, p + 1))
+              }
+            />
+
+            {error && <p className="text-red-600 text-sm">{error}</p>}
+          </div>
+        </div>
       )}
 
       {isAdmin && (
