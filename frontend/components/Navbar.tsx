@@ -202,12 +202,12 @@ export default function Navbar() {
     <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b">
       <div className="flex flex-wrap lg:flex-nowrap items-center gap-6 px-6 py-4">
         {/* LEFT */}
-        <Link href="/" className="text-2xl font-serif whitespace-nowrap order-1 pl-5 pr-20">
+        <Link href="/" className="text-2xl font-serif whitespace-nowrap order-1 pl-5">
           Royal Center
         </Link>
 
         {/* SEARCH */}
-        <div className="relative w-full order-3 lg:order-2 lg:flex-1 lg:max-w-5xl">
+        <div className="relative w-full order-3 lg:order-2 lg:flex-1 lg:max-w-5xl pl-20">
           <div className="flex">
             <input
               ref={inputRef}

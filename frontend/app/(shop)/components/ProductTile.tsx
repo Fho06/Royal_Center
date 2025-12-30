@@ -61,7 +61,7 @@ export function ProductTile({
   if (variant === "featured") {
     return (
       <div className="group h-full w-full rounded-2xl border bg-white overflow-hidden shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md">
-        <div className="relative h-full">
+        <div role="button" className="relative h-full">
           <Image
             src={src}
             alt={item.name}
@@ -139,47 +139,54 @@ export function ProductTile({
      SEARCH (CLASSIC CARD)
      ========================= */
   return (
-    <div className="h-full w-full rounded-2xl border bg-white p-4 flex flex-col gap-3 hover:shadow-md">
-      {/* IMAGE (do not let it collapse) */}
-      <div className="relative w-full h-40 rounded-xl overflow-hidden bg-black/5">
+    <div className="h-full min-h-[460px] w-full rounded-xl border border-gray-200 bg-white flex flex-col hover:shadow-sm transition-shadow">
+      {/* IMAGE (dominates height) */}
+      <div className="relative w-full h-[340px] shrink-0">
         <Image
           src={src}
           alt={item.name}
           fill
-          sizes="(max-width: 768px) 100vw, 33vw"
+          sizes="(max-width: 768px) 100vw, 25vw"
           onError={onImgError}
           className="object-contain"
         />
       </div>
 
-      <div className="flex-1">
-        <div className="font-semibold leading-tight line-clamp-2">{item.name}</div>
-        <div className="text-lg font-bold">${item.price_usd.toFixed(2)}</div>
-      </div>
-
-      {qty <= 0 ? (
-        <button
-          onClick={() => addToCart(item)}
-          disabled={outOfStock}
-          className="self-end rounded-full bg-black px-5 py-2 text-sm font-medium text-white hover:bg-black/90 disabled:opacity-50"
-        >
-          Agregar
-        </button>
-      ) : (
-        <div className="self-end flex items-center gap-2 rounded-full border px-3 py-2">
-          <button onClick={() => decreaseQty(item.id)} className="px-2">
-            −
-          </button>
-          <span className="text-sm font-semibold">{qty}</span>
-          <button
-            onClick={() => increaseQty(item.id)}
-            disabled={!canIncrease(item.id)}
-            className="px-2 disabled:opacity-50"
-          >
-            +
-          </button>
+      {/* CONTENT (auto height, no growth) */}
+      <div className="px-3 py-2 flex flex-col gap-1">
+        <div className="text-sm font-medium leading-snug line-clamp-2">
+          {item.name}
         </div>
-      )}
+
+        <div className="text-base font-semibold">
+          ${item.price_usd.toFixed(2)}
+        </div>
+
+        {qty <= 0 ? (
+          <button
+            onClick={() => addToCart(item)}
+            disabled={outOfStock}
+            className="mt-1 w-fit rounded-full bg-yellow-400 px-3 py-1.5 text-sm font-medium text-black hover:bg-yellow-300 disabled:opacity-50"
+          >
+            Agregar
+          </button>
+        ) : (
+          <div className="mt-1 flex items-center gap-2 rounded-full border px-2 py-1 w-fit">
+            <button onClick={() => decreaseQty(item.id)} className="px-1">
+              −
+            </button>
+            <span className="text-sm font-semibold">{qty}</span>
+            <button
+              onClick={() => increaseQty(item.id)}
+              disabled={!canIncrease(item.id)}
+              className="px-1 disabled:opacity-50"
+            >
+              +
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
+
 }

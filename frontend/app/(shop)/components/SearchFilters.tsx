@@ -72,7 +72,7 @@ export function SearchFilters({
     }, [categories, visibleSubcategories]);
 
   return (
-    <aside className="border rounded-xl p-4 space-y-4 sticky top-28">
+    <aside className="rounded-xl p-4 space-y-4 sticky top-28 bg-gray-100"> {/* Edit for border/background */}
       <button
         onClick={() => setOpen((v) => !v)}
         className="font-semibold w-full text-left"
