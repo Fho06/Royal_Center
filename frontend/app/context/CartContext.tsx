@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 
 type CartItem = {
@@ -20,10 +20,7 @@ type CartContextType = {
 const CartContext = createContext<CartContextType | null>(null);
 
 /* ============================================================
-   CART STORAGE KEY RESOLUTION
-   ============================================================
-   - Guest users get a guest cart
-   - Logged-in users get their own cart
+   STORAGE KEY
    ============================================================ */
 
 function getCartStorageKey(userId?: number) {
@@ -34,16 +31,30 @@ function getCartStorageKey(userId?: number) {
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const storageKey = getCartStorageKey(user?.userId);
 
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [hydrated, setHydrated] = useState(false);
+
+  // storageKey must NOT change during hydration
+  const storageKeyRef = useRef<string | null>(null);
 
   /* ============================================================
-     LOAD CART WHEN USER CHANGES
+     HYDRATION BARRIER
      ============================================================ */
 
   useEffect(() => {
-    const stored = localStorage.getItem(storageKey);
+    storageKeyRef.current = getCartStorageKey(user?.userId);
+    setHydrated(true);
+  }, [user?.userId]);
+
+  /* ============================================================
+     LOAD CART (CLIENT ONLY)
+     ============================================================ */
+
+  useEffect(() => {
+    if (!hydrated || !storageKeyRef.current) return;
+
+    const stored = localStorage.getItem(storageKeyRef.current);
     if (!stored) {
       setCart([]);
       return;
@@ -52,22 +63,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       setCart(JSON.parse(stored));
     } catch {
-      localStorage.removeItem(storageKey);
+      localStorage.removeItem(storageKeyRef.current);
       setCart([]);
     }
-  }, [storageKey]);
+  }, [hydrated]);
 
   /* ============================================================
-     PERSIST CART
+     PERSIST CART (CLIENT ONLY)
      ============================================================ */
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(cart));
-  }, [cart, storageKey]);
+    if (!hydrated || !storageKeyRef.current) return;
+    localStorage.setItem(storageKeyRef.current, JSON.stringify(cart));
+  }, [cart, hydrated]);
 
   function clearCart() {
+    if (!storageKeyRef.current) return;
     setCart([]);
-    localStorage.removeItem(storageKey);
+    localStorage.removeItem(storageKeyRef.current);
   }
 
   return (

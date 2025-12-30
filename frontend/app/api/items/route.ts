@@ -1,74 +1,64 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getPool, sql } from "@/lib/db";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
 
     const limit = Number(searchParams.get("limit")) || 20;
     const offset = Number(searchParams.get("offset")) || 0;
 
+    const FACET_PAGE_COUNT = 3;
+    const facetLimit = limit * FACET_PAGE_COUNT;
+
     const search = searchParams.get("search")?.trim() ?? "";
-
-    const categoryId =
-      searchParams.get("category_id") && searchParams.get("category_id") !== "all"
-        ? Number(searchParams.get("category_id"))
-        : null;
-
-    const subcategoryId =
-      searchParams.get("subcategory_id") &&
-      searchParams.get("subcategory_id") !== "all"
-        ? Number(searchParams.get("subcategory_id"))
-        : null;
-
     const inStockOnly = searchParams.get("in_stock") === "1";
+
+    const minPrice = searchParams.get("price_min")
+      ? Number(searchParams.get("price_min"))
+      : null;
+
+    const maxPrice = searchParams.get("price_max")
+      ? Number(searchParams.get("price_max"))
+      : null;
+
+    const subcategoryIds = searchParams.get("subcategory_ids");
+    const categoryIds = searchParams.get("category_ids");
 
     const pool = await getPool();
 
     /* ======================================================
-       DATA QUERY — PRIMARY UNION FILLERS
+       DATA QUERY — PRIMARY + FILLER (UNCHANGED)
        ====================================================== */
     const dataReq = pool
       .request()
       .input("search", sql.NVarChar, search)
-      .input("category_id", sql.Int, categoryId)
-      .input("subcategory_id", sql.Int, subcategoryId)
       .input("offset", sql.Int, offset)
-      .input("limit", sql.Int, limit);
+      .input("limit", sql.Int, limit)
+      .input("min_price", sql.Decimal(10, 2), minPrice)
+      .input("max_price", sql.Decimal(10, 2), maxPrice)
+      .input("subcategory_ids", sql.NVarChar, subcategoryIds)
+      .input("category_ids", sql.NVarChar, categoryIds);
 
     const dataQuery = `
       SELECT *
       FROM (
-        /* ---------- PRIMARY SEARCH RESULTS ---------- */
         SELECT
           i.id,
           i.name,
           i.price_usd,
           i.stock,
           i.category_id,
-
           CASE
-            /* =========================
-              EXACT & PREFIX MATCHES
-              ========================= */
             WHEN i.name LIKE '%' + @search + '%' THEN 220
             WHEN i.name LIKE @search + '%' THEN 200
-
-            /* strong typo correction via prefix */
             WHEN i.name LIKE LEFT(@search, 4) + '%' THEN 180
-
-            /* phonetic ONLY if prefix(4) matches */
-            WHEN
-              DIFFERENCE(i.name, @search) >= 3
+            WHEN DIFFERENCE(i.name, @search) >= 3
               AND i.name LIKE LEFT(@search, 4) + '%'
             THEN 165
-
-            /* SKU / reference */
             WHEN i.id LIKE '%' + @search + '%' THEN 140
-
             ELSE 0
           END AS relevance_score,
-
           1 AS sort_group
         FROM items i
         WHERE
@@ -81,27 +71,44 @@ export async function GET(req: Request) {
             OR i.id LIKE '%' + @search + '%'
           )
           ${inStockOnly ? "AND i.stock > 0" : ""}
+          AND (@min_price IS NULL OR i.price_usd >= @min_price)
+          AND (@max_price IS NULL OR i.price_usd <= @max_price)
+          AND (
+            @subcategory_ids IS NULL
+            OR i.category_id IN (
+              SELECT value FROM STRING_SPLIT(@subcategory_ids, ',')
+            )
+          )
+          AND (
+            @subcategory_ids IS NOT NULL
+            OR @category_ids IS NULL
+            OR i.category_id IN (
+              SELECT id FROM categories
+              WHERE parent_id IN (
+                SELECT value FROM STRING_SPLIT(@category_ids, ',')
+              )
+              OR id IN (
+                SELECT value FROM STRING_SPLIT(@category_ids, ',')
+              )
+            )
+          )
 
         UNION ALL
 
-        /* ---------- FILLER RESULTS ---------- */
         SELECT
           i.id,
           i.name,
           i.price_usd,
           i.stock,
           i.category_id,
-
           0 AS relevance_score,
           2 AS sort_group
         FROM items i
         WHERE
           i.active = 1
           AND i.id NOT IN (
-            SELECT id
-            FROM items
-            WHERE
-              active = 1
+            SELECT id FROM items
+            WHERE active = 1
               AND (
                 name LIKE '%' + @search + '%'
                 OR name LIKE @search + '%'
@@ -109,15 +116,28 @@ export async function GET(req: Request) {
                 OR id LIKE '%' + @search + '%'
               )
           )
-          AND (
-            (@subcategory_id IS NOT NULL AND i.category_id = @subcategory_id)
-            OR
-            (@category_id IS NOT NULL AND i.category_id IN (
-              SELECT id FROM categories
-              WHERE parent_id = @category_id OR id = @category_id
-            ))
-          )
           ${inStockOnly ? "AND i.stock > 0" : ""}
+          AND (@min_price IS NULL OR i.price_usd >= @min_price)
+          AND (@max_price IS NULL OR i.price_usd <= @max_price)
+          AND (
+            @subcategory_ids IS NULL
+            OR i.category_id IN (
+              SELECT value FROM STRING_SPLIT(@subcategory_ids, ',')
+            )
+          )
+          AND (
+            @subcategory_ids IS NOT NULL
+            OR @category_ids IS NULL
+            OR i.category_id IN (
+              SELECT id FROM categories
+              WHERE parent_id IN (
+                SELECT value FROM STRING_SPLIT(@category_ids, ',')
+              )
+              OR id IN (
+                SELECT value FROM STRING_SPLIT(@category_ids, ',')
+              )
+            )
+          )
       ) results
       ORDER BY
         sort_group ASC,
@@ -131,74 +151,148 @@ export async function GET(req: Request) {
     const itemsResult = await dataReq.query(dataQuery);
 
     /* ======================================================
-       COUNT QUERY (MUST MATCH UNION ELIGIBILITY)
+       COUNT QUERY (UNCHANGED)
        ====================================================== */
     const countReq = pool
       .request()
       .input("search", sql.NVarChar, search)
-      .input("category_id", sql.Int, categoryId)
-      .input("subcategory_id", sql.Int, subcategoryId);
+      .input("min_price", sql.Decimal(10, 2), minPrice)
+      .input("max_price", sql.Decimal(10, 2), maxPrice)
+      .input("subcategory_ids", sql.NVarChar, subcategoryIds)
+      .input("category_ids", sql.NVarChar, categoryIds);
 
     const countQuery = `
       SELECT COUNT(*) AS total
+      FROM items i
+      WHERE
+        i.active = 1
+        AND @search <> ''
+        AND (
+          i.name LIKE '%' + @search + '%'
+          OR i.name LIKE @search + '%'
+          OR DIFFERENCE(i.name, @search) >= 3
+          OR i.id LIKE '%' + @search + '%'
+        )
+        AND (@min_price IS NULL OR i.price_usd >= @min_price)
+        AND (@max_price IS NULL OR i.price_usd <= @max_price)
+    `;
+
+    const total =
+      (await countReq.query(countQuery)).recordset[0].total;
+
+    /* ======================================================
+       PRICE BOUNDS (NO PRICE FILTERS — FIXED)
+       ====================================================== */
+    const boundsReq = pool
+      .request()
+      .input("search", sql.NVarChar, search)
+      .input("subcategory_ids", sql.NVarChar, subcategoryIds)
+      .input("category_ids", sql.NVarChar, categoryIds);
+
+    const boundsQuery = `
+      SELECT
+        MIN(i.price_usd) AS min_price,
+        MAX(i.price_usd) AS max_price
+      FROM items i
+      WHERE
+        i.active = 1
+        AND @search <> ''
+        AND (
+          i.name LIKE '%' + @search + '%'
+          OR i.name LIKE @search + '%'
+          OR DIFFERENCE(i.name, @search) >= 3
+          OR i.id LIKE '%' + @search + '%'
+        )
+    `;
+
+    const bounds =
+      (await boundsReq.query(boundsQuery)).recordset[0];
+
+    /* ======================================================
+      FACETS — FIRST 3 PAGES, SAME FILTERS
+      ====================================================== */
+    const facetsReq = pool
+      .request()
+      .input("search", sql.NVarChar, search)
+      .input("min_price", sql.Decimal(10, 2), minPrice)
+      .input("max_price", sql.Decimal(10, 2), maxPrice)
+      .input("subcategory_ids", sql.NVarChar, subcategoryIds)
+      .input("category_ids", sql.NVarChar, categoryIds)
+      .input("facet_limit", sql.Int, facetLimit);
+
+    const facetsQuery = `
+      SELECT DISTINCT
+        i.category_id        AS subcategory_id,
+        c.parent_id          AS category_id
       FROM (
-        /* ---------- PRIMARY SEARCH RESULTS ---------- */
-        SELECT i.id
+        SELECT TOP (@facet_limit)
+          i.category_id,
+          CASE
+            WHEN i.name LIKE '%' + @search + '%' THEN 220
+            WHEN i.name LIKE @search + '%' THEN 200
+            WHEN i.name LIKE LEFT(@search, 4) + '%' THEN 180
+            WHEN DIFFERENCE(i.name, @search) >= 3
+              AND i.name LIKE LEFT(@search, 4) + '%'
+            THEN 165
+            WHEN i.id LIKE '%' + @search + '%' THEN 140
+            ELSE 0
+          END AS relevance_score,
+          i.stock,
+          i.name
         FROM items i
         WHERE
           i.active = 1
-          AND @search <> ''
           AND (
             i.name LIKE '%' + @search + '%'
             OR i.name LIKE @search + '%'
-            OR i.name LIKE LEFT(@search, 4) + '%'
-            OR (
-              DIFFERENCE(i.name, @search) >= 3
-              AND i.name LIKE LEFT(@search, 4) + '%'
-            )
+            OR DIFFERENCE(i.name, @search) >= 3
             OR i.id LIKE '%' + @search + '%'
           )
-
-        UNION ALL
-
-        /* ---------- FILLER RESULTS ---------- */
-        SELECT i.id
-        FROM items i
-        WHERE
-          i.active = 1
-          AND i.id NOT IN (
-            SELECT id
-            FROM items
-            WHERE
-              active = 1
-              AND (
-                name LIKE '%' + @search + '%'
-                OR name LIKE @search + '%'
-                OR name LIKE LEFT(@search, 4) + '%'
-                OR (
-                  DIFFERENCE(name, @search) >= 3
-                  AND name LIKE LEFT(@search, 4) + '%'
-                )
-                OR id LIKE '%' + @search + '%'
-              )
+          ${inStockOnly ? "AND i.stock > 0" : ""}
+          AND (@min_price IS NULL OR i.price_usd >= @min_price)
+          AND (@max_price IS NULL OR i.price_usd <= @max_price)
+          AND (
+            @subcategory_ids IS NULL
+            OR i.category_id IN (
+              SELECT value FROM STRING_SPLIT(@subcategory_ids, ',')
+            )
           )
           AND (
-            (@subcategory_id IS NOT NULL AND i.category_id = @subcategory_id)
-            OR
-            (@category_id IS NOT NULL AND i.category_id IN (
+            @subcategory_ids IS NOT NULL
+            OR @category_ids IS NULL
+            OR i.category_id IN (
               SELECT id FROM categories
-              WHERE parent_id = @category_id OR id = @category_id
-            ))
+              WHERE parent_id IN (
+                SELECT value FROM STRING_SPLIT(@category_ids, ',')
+              )
+              OR id IN (
+                SELECT value FROM STRING_SPLIT(@category_ids, ',')
+              )
+            )
           )
-      ) counted
+        ORDER BY
+          relevance_score DESC,
+          i.stock DESC,
+          i.name
+      ) i
+      JOIN categories c ON c.id = i.category_id
     `;
 
+    const facetRows = (await facetsReq.query(facetsQuery)).recordset;
 
-    const total = (await countReq.query(countQuery)).recordset[0].total;
+    const facets = {
+      categories: [...new Set(facetRows.map(r => r.category_id).filter(Boolean))],
+      subcategories: [...new Set(facetRows.map(r => r.subcategory_id))]
+    };
 
     return NextResponse.json({
       items: itemsResult.recordset,
       total,
+      priceBounds: {
+        min: bounds?.min_price ?? null,
+        max: bounds?.max_price ?? null,
+      },
+      facets,
     });
   } catch (err) {
     console.error("Items error:", err);

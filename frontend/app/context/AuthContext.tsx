@@ -7,9 +7,9 @@ type User = {
   role: "admin" | "user";
 };
 
-type AuthContextType = {
-  isAuthenticated: boolean;
+export type AuthContextType = {
   user: User | null;
+  isAuthenticated: boolean;
   loading: boolean;
   login: (token: string) => void;
   logout: () => void;
@@ -19,17 +19,22 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
 
   const isAuthenticated = !!user;
+  const loading = !hydrated; // ✅ SINGLE SOURCE OF TRUTH
 
-  /* ---------- LOAD TOKEN ON START ---------- */
+  /* ============================================================
+     HYDRATE AUTH (CLIENT ONLY)
+     ============================================================ */
   useEffect(() => {
     const token = localStorage.getItem("token");
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+
+    if (!token) {
+      setHydrated(true);
+      return;
+    }
+
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
       setUser({
@@ -38,12 +43,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     } catch {
       localStorage.removeItem("token");
+      setUser(null);
     } finally {
-      setLoading(false);
+      setHydrated(true);
     }
   }, []);
 
-  /* ---------- LOGIN ---------- */
+  /* ============================================================
+     LOGIN
+     ============================================================ */
   function login(token: string) {
     localStorage.setItem("token", token);
 
@@ -54,7 +62,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }
 
-  /* ---------- LOGOUT ---------- */
+  /* ============================================================
+     LOGOUT
+     ============================================================ */
   function logout() {
     localStorage.removeItem("token");
     setUser(null);
@@ -62,7 +72,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, user, loading, login, logout }}
+      value={{
+        user,
+        isAuthenticated,
+        loading, // ✅ now real and typed
+        login,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>
