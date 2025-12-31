@@ -5,24 +5,28 @@ import jwt from "jsonwebtoken";
 
 export async function POST(req: Request) {
   try {
-    const { email, password } = await req.json();
+    const { phone, passcode } = await req.json();
 
-    if (!email || !password) {
+    if (!phone || !/^\d{4}$/.test(passcode)) {
       return NextResponse.json(
-        { error: "Email and password required" },
+        { error: "Phone and 4-digit passcode required" },
         { status: 400 }
       );
     }
+
+    // ✅ Normalize phone (FRONTEND SENDS WITHOUT +58)
+    const fullPhone = `+58${phone}`;
 
     const pool = await getPool();
 
     const result = await pool
       .request()
-      .input("email", sql.VarChar, email)
+      .input("phone", sql.VarChar(15), fullPhone)
       .query(`
-        SELECT id, password_hash, role
-        FROM users
-        WHERE email = @email
+        SELECT user_id, passcode_hash, role
+        FROM dbo.users
+        WHERE phone = @phone
+          AND otp_verified = 1
       `);
 
     if (result.recordset.length === 0) {
@@ -33,9 +37,17 @@ export async function POST(req: Request) {
     }
 
     const user = result.recordset[0];
+
+    if (!user.passcode_hash) {
+      return NextResponse.json(
+        { error: "Passcode not set" },
+        { status: 403 }
+      );
+    }
+
     const valid = await bcrypt.compare(
-      password,
-      user.password_hash
+      passcode,
+      user.passcode_hash
     );
 
     if (!valid) {
@@ -46,7 +58,10 @@ export async function POST(req: Request) {
     }
 
     const token = jwt.sign(
-      { userId: user.id, role: user.role },
+      {
+        userId: user.user_id,
+        role: user.role,
+      },
       process.env.JWT_SECRET!,
       { expiresIn: "7d" }
     );
