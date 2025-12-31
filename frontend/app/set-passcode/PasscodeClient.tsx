@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "../context/AuthContext";
 
-export default function LoginClient() {
+export default function PasscodeClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
 
-  const [phone, setPhone] = useState("");
+  // phone must be passed as ?phone=4121234567
+  const phone = searchParams.get("phone");
+
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState("");
 
@@ -18,13 +18,18 @@ export default function LoginClient() {
     e.preventDefault();
     setError("");
 
+    if (!phone) {
+      setError("Missing phone number");
+      return;
+    }
+
     if (!/^\d{4}$/.test(passcode)) {
       setError("Passcode must be 4 digits");
       return;
     }
 
     try {
-      const data = await apiRequest("/auth/login", {
+      await apiRequest("/auth/set-passcode", {
         method: "POST",
         body: JSON.stringify({
           phone,
@@ -32,16 +37,11 @@ export default function LoginClient() {
         }),
       });
 
-      login(data.token);
-
-      const next = searchParams.get("next");
-      router.push(next || "/");
+      router.push("/account");
     } catch (err: any) {
       setError(err.message);
     }
   }
-
-  const nextParam = searchParams.get("next");
 
   return (
     <div className="flex min-h-screen items-center justify-center">
@@ -49,32 +49,16 @@ export default function LoginClient() {
         onSubmit={handleSubmit}
         className="w-full max-w-sm space-y-4 rounded border p-6"
       >
-        <h1 className="text-xl font-semibold">Login</h1>
+        <h1 className="text-xl font-semibold">Set Passcode</h1>
 
         {error && <p className="text-red-600">{error}</p>}
 
-        {/* PHONE */}
-        <div className="flex">
-          <span className="flex items-center rounded-l border px-3 bg-gray-100">
-            +58
-          </span>
-          <input
-            type="tel"
-            placeholder="0123456789"
-            className="w-full rounded-r border p-2"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            required
-          />
-        </div>
-
-        {/* PASSCODE */}
         <input
           type="password"
           inputMode="numeric"
           pattern="\d{4}"
           maxLength={4}
-          placeholder="Código de Acceso (4 Dígitos)"
+          placeholder="4-digit passcode"
           className="w-full rounded border p-2 text-center tracking-widest"
           value={passcode}
           onChange={(e) => setPasscode(e.target.value)}
@@ -85,22 +69,8 @@ export default function LoginClient() {
           type="submit"
           className="w-full rounded bg-black p-2 text-white"
         >
-          Log In
+          Finish
         </button>
-
-        <p className="text-sm">
-          Don’t have an account?{" "}
-          <a
-            href={
-              nextParam
-                ? `/register?next=${encodeURIComponent(nextParam)}`
-                : "/register"
-            }
-            className="underline"
-          >
-            Sign up
-          </a>
-        </p>
       </form>
     </div>
   );

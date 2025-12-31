@@ -2,14 +2,26 @@
 
 import { useState } from "react";
 import { apiRequest } from "@/lib/api";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function RegisterClient() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
+  const [accountType, setAccountType] = useState<"natural" | "juridico">(
+    "natural"
+  );
+
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [gender, setGender] = useState<"male" | "female">("male");
+
+  const [companyName, setCompanyName] = useState("");
+  const [rif, setRif] = useState("");
+
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
@@ -20,19 +32,24 @@ export default function RegisterClient() {
       await apiRequest("/auth/register", {
         method: "POST",
         body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          password,
+          phone: `+58${phone}`,
+          email,
+          accountType,
+          firstName,
+          lastName,
+          gender,
+          companyName,
+          rif,
+          termsAccepted,
         }),
       });
 
-      const next = searchParams.get("next");
-      router.push(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
+      // Next step in flow, CHANGE TO OTP LATER****
+      router.push(`/set-passcode?phone=${phone}`);
     } catch (err: any) {
       setError(err.message);
     }
   }
-
-  const next = searchParams.get("next");
 
   return (
     <div className="flex min-h-screen items-center justify-center">
@@ -44,40 +61,135 @@ export default function RegisterClient() {
 
         {error && <p className="text-red-600">{error}</p>}
 
+        {/* ACCOUNT TYPE */}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setAccountType("natural")}
+            className={`flex-1 rounded p-2 ${
+              accountType === "natural" ? "bg-black text-white" : "border"
+            }`}
+          >
+            Natural
+          </button>
+          <button
+            type="button"
+            onClick={() => setAccountType("juridico")}
+            className={`flex-1 rounded p-2 ${
+              accountType === "juridico" ? "bg-black text-white" : "border"
+            }`}
+          >
+            Jurídico
+          </button>
+        </div>
+
+        {/* PHONE */}
+        <div className="flex">
+          <span className="flex items-center rounded-l border px-3 bg-gray-100">
+            +58
+          </span>
+          <input
+            type="tel"
+            className="w-full rounded-r border p-2"
+            placeholder="0123456789"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
+          />
+        </div>
+
+        {/* EMAIL */}
         <input
           type="email"
-          placeholder="Email"
+          placeholder="Correo Electrónico (opcional)"
           className="w-full rounded border p-2"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          required
         />
 
-        <input
-          type="password"
-          placeholder="Password (min 6 chars)"
-          className="w-full rounded border p-2"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        {/* NATURAL */}
+        {accountType === "natural" && (
+          <>
+            <input
+              type="text"
+              placeholder="Nombre"
+              className="w-full rounded border p-2"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+            />
+
+            <input
+              type="text"
+              placeholder="Apellido"
+              className="w-full rounded border p-2"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
+            />
+
+            <select
+              className="w-full rounded border p-2"
+              value={gender}
+              onChange={(e) => setGender(e.target.value as "male" | "female")}
+            >
+              <option value="male">Masculino</option>
+              <option value="female">Femenino</option>
+            </select>
+          </>
+        )}
+
+        {/* JURIDICO */}
+        {accountType === "juridico" && (
+          <>
+            <input
+              type="text"
+              placeholder="Nombre de la Compañía"
+              className="w-full rounded border p-2"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              required
+            />
+
+            <input
+              type="text"
+              placeholder="RIF (e.g. J123456789)"
+              className="w-full rounded border p-2"
+              value={rif}
+              onChange={(e) => setRif(e.target.value)}
+              required
+            />
+          </>
+        )}
+
+        {/* TERMS */}
+        <label className="flex items-center gap-2 text-sm pl-10">
+          <input
+            type="checkbox"
+            checked={termsAccepted}
+            onChange={(e) => setTermsAccepted(e.target.checked)}
+            required
+          />
+          Acepto los Términos y Condiciones
+        </label>
 
         <button
           type="submit"
           className="w-full rounded bg-black p-2 text-white"
         >
-          Register
+          Continue
         </button>
-
-        <p className="text-sm">
-          Already have an account?{" "}
-          <a
-            href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
-            className="underline"
-          >
-            Go back to login
-          </a>
-        </p>
+        {/* HAVE ACCOUNT */}
+          <p className="text-center text-sm text-gray-600">
+            ¿Ya tienes una cuenta?{" "}
+            <button
+              type="button"
+              onClick={() => router.push("/login")}
+              className="font-medium text-black underline"
+            >
+              Iniciar sesión
+            </button>
+          </p>
       </form>
     </div>
   );
