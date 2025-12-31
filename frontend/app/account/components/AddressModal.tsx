@@ -28,7 +28,7 @@ const REQUIRED_FIELDS: (keyof AddressForm)[] = [
   "address_1",
   "state",
   "city",
-  "municipio",
+  "municipio"
 ];
 
 const emptyAddress: AddressForm = {
@@ -49,7 +49,7 @@ const FIELD_LABELS_ES: Record<keyof AddressForm, string> = {
   country: "País",
   state: "Estado",
   city: "Ciudad",
-  municipio: "Municipio",
+  municipio: "Municipio (opcional)",
   is_default: "Dirección predeterminada",
 };
 
@@ -100,10 +100,11 @@ export function AddressModal({
     const newMissing: Partial<Record<keyof AddressForm, boolean>> = {};
 
     REQUIRED_FIELDS.forEach((key) => {
-        const value = form[key];
-        if (typeof value !== "string" || value.trim() === "") newMissing[key] = true;
+      const value = form[key];
+      if (typeof value !== "string" || value.trim() === "") {
+        newMissing[key] = true;
+      }
     });
-
 
     if (Object.keys(newMissing).length > 0) {
       setMissing(newMissing);
@@ -128,12 +129,40 @@ export function AddressModal({
     await reload();
   }
 
+  async function remove() {
+    if (!editing) return;
+
+    const confirmed = window.confirm(
+      "¿Eliminar esta dirección? Esta acción no se puede deshacer."
+    );
+
+    if (!confirmed) return;
+
+    await apiRequest(`/addresses/${editing.address_id}`, {
+      method: "DELETE",
+    });
+
+    close();
+    await reload();
+  }
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md space-y-3">
-        <h3 className="text-lg font-semibold">
-          {editing ? "Editar dirección" : "Agregar dirección"}
-        </h3>
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-semibold">
+            {editing ? "Editar dirección" : "Agregar dirección"}
+          </h3>
+
+          {editing && (
+            <button
+              onClick={remove}
+              className="text-sm text-red-600"
+            >
+              Eliminar
+            </button>
+          )}
+        </div>
 
         {FIELD_ORDER.map((key) =>
           key === "is_default" ? (

@@ -18,6 +18,17 @@ function formatRIF(raw: string) {
 }
 
 export async function POST(req: Request) {
+  /* =========================
+     ENV VALIDATION (FAIL FAST)
+     ========================= */
+  if (!process.env.JWT_SECRET) {
+    console.error("JWT_SECRET is not defined");
+    return NextResponse.json(
+      { error: "Server configuration error" },
+      { status: 500 }
+    );
+  }
+
   try {
     const {
       phone, // WITHOUT +58
@@ -49,11 +60,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // normalize phone for DB
     const fullPhone = `+58${phone}`;
 
     /* =========================
-       ACCOUNT-TYPE VALIDATION
+       ACCOUNT TYPE VALIDATION
        ========================= */
     let formattedRif: string | null = null;
 
@@ -65,7 +75,6 @@ export async function POST(req: Request) {
         );
       }
     } else {
-      // juridico
       if (!companyName || !rif) {
         return NextResponse.json(
           { error: "Juridico requires company name and RIF" },
@@ -86,71 +95,80 @@ export async function POST(req: Request) {
        HASH PASSCODE
        ========================= */
     const passcodeHash = await bcrypt.hash(passcode, 10);
+
     const pool = await getPool();
+    const tx = pool.transaction();
 
     /* =========================
-       INSERT USER + RETURN ID
+       TRANSACTION START
        ========================= */
-    const result = await pool
-      .request()
-      .input("phone", sql.VarChar(15), fullPhone)
-      .input("email", sql.VarChar(255), email || null)
-      .input("account_type", sql.VarChar(10), accountType)
-      .input("first_name", sql.VarChar(100), firstName || null)
-      .input("last_name", sql.VarChar(150), lastName || null)
-      .input("gender", sql.VarChar(6), gender || null)
-      .input("company_name", sql.VarChar(255), companyName || null)
-      .input("rif", sql.VarChar(15), formattedRif)
-      .input("passcode_hash", sql.VarChar(255), passcodeHash)
-      .input("terms_accepted_at", sql.DateTime, new Date())
-      .query(`
-        INSERT INTO dbo.users (
-          phone,
-          email,
-          account_type,
-          first_name,
-          last_name,
-          gender,
-          company_name,
-          rif,
-          passcode_hash,
-          otp_verified,
-          terms_accepted_at
-        )
-        OUTPUT INSERTED.user_id, INSERTED.role
-        VALUES (
-          @phone,
-          @email,
-          @account_type,
-          @first_name,
-          @last_name,
-          @gender,
-          @company_name,
-          @rif,
-          @passcode_hash,
-          1,
-          @terms_accepted_at
-        )
-      `);
+    await tx.begin();
 
-    const user = result.recordset[0];
+    try {
+      const result = await tx
+        .request()
+        .input("phone", sql.VarChar(15), fullPhone)
+        .input("email", sql.VarChar(255), email || null)
+        .input("account_type", sql.VarChar(10), accountType)
+        .input("first_name", sql.VarChar(100), firstName || null)
+        .input("last_name", sql.VarChar(150), lastName || null)
+        .input("gender", sql.VarChar(6), gender || null)
+        .input("company_name", sql.VarChar(255), companyName || null)
+        .input("rif", sql.VarChar(15), formattedRif)
+        .input("passcode_hash", sql.VarChar(255), passcodeHash)
+        .input("terms_accepted_at", sql.DateTime, new Date())
+        .query(`
+          INSERT INTO dbo.users (
+            phone,
+            email,
+            account_type,
+            first_name,
+            last_name,
+            gender,
+            company_name,
+            rif,
+            passcode_hash,
+            otp_verified,
+            role,
+            terms_accepted_at
+          )
+          OUTPUT INSERTED.user_id, INSERTED.role
+          VALUES (
+            @phone,
+            @email,
+            @account_type,
+            @first_name,
+            @last_name,
+            @gender,
+            @company_name,
+            @rif,
+            @passcode_hash,
+            1,
+            'user',
+            @terms_accepted_at
+          )
+        `);
 
-    /* =========================
-       ISSUE JWT
-       ========================= */
-    const token = jwt.sign(
-      {
-        userId: user.user_id,
-        role: user.role,
-      },
-      process.env.JWT_SECRET!,
-      { expiresIn: "7d" }
-    );
+      const user = result.recordset[0];
 
-    return NextResponse.json({ token });
+      const token = jwt.sign(
+        {
+          userId: user.user_id,
+          role: user.role,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+
+      await tx.commit();
+      return NextResponse.json({ token });
+
+    } catch (err) {
+      await tx.rollback();
+      throw err;
+    }
 
   } catch (err: any) {
-    // unique constraint (phone or rif)
     if (err?.number === 2627) {
       return NextResponse.json(
         { error: "Account already exists" },

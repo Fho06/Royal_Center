@@ -22,21 +22,23 @@ export function ProductList({
   canIncrease,
 }: Props) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-      {items.map((item) => (
-        <ProductTile
-          key={item.id}
-          item={item}
-          cartQty={cartQty}
-          remainingStock={remainingStock}
-          addToCart={addToCart}
-          increaseQty={increaseQty}
-          decreaseQty={decreaseQty}
-          canIncrease={canIncrease}
-          variant="search"
-        />
-      ))}
+    /* AMAZON-STYLE CONTAINMENT */
+    <div className="app-shell">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+        {items.map((item) => (
+          <ProductTile
+            key={item.id}
+            item={item}
+            cartQty={cartQty}
+            remainingStock={remainingStock}
+            addToCart={addToCart}
+            increaseQty={increaseQty}
+            decreaseQty={decreaseQty}
+            canIncrease={canIncrease}
+            variant="search"
+          />
+        ))}
+      </div>
     </div>
   );
 }
-

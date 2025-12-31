@@ -2,7 +2,7 @@ import "./globals.css";
 import { Suspense } from "react";
 import { CartProvider } from "@/app/context/CartContext";
 import { AuthProvider } from "@/app/context/AuthContext";
-import Navbar from "@/components/Navbar";
+import Navbar from "@/app/components/Navbar";
 
 export default function RootLayout({
   children,
