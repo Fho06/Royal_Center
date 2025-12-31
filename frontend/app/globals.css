@@ -5,6 +5,12 @@
   --foreground: #171717;
 }
 
+.featured-tile-frame {
+  border-radius: 1rem;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -58,3 +64,38 @@ label {
   cursor: pointer;
 }
 
+/* ===============================
+   RESPONSIVENESS CONTAINMENT
+   =============================== */
+
+.app-shell {
+  width: 100%;
+  padding-left: 16px;   /* mobile */
+  padding-right: 16px;
+}
+
+/* Large phones / tablets */
+@media (min-width: 640px) {
+  .app-shell {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+/* Desktop containment */
+@media (min-width: 1024px) {
+  .app-shell {
+    max-width: 1280px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 0;    /* prevent double padding */
+    padding-right: 0;
+  }
+}
+
+/* Ultra-wide stability */
+@media (min-width: 1536px) {
+  .app-shell {
+    max-width: 1440px;
+  }
+}

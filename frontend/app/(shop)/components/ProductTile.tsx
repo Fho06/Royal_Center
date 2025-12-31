@@ -42,7 +42,6 @@ export function ProductTile({
   const qty = cartQty(item.id);
   const outOfStock = remainingStock(item) <= 0;
 
-  // robust fallback for both variants
   const [extIndex, setExtIndex] = useState(0);
   const [failed, setFailed] = useState(false);
 
@@ -60,7 +59,7 @@ export function ProductTile({
      ========================= */
   if (variant === "featured") {
     return (
-      <div className="group h-full w-full rounded-2xl border bg-white overflow-hidden shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md">
+      <div className="group h-full w-full rounded-2xl bg-white overflow-hidden transition-transform hover:-translate-y-0.5 hover:shadow-md">
         <div role="button" className="relative h-full">
           <Image
             src={src}
@@ -111,7 +110,7 @@ export function ProductTile({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
-                    className="h-8 w-8 rounded-lg border hover:bg-black/5"
+                    className="h-8 w-8 rounded-lg hover:bg-black/5"
                     onClick={() => decreaseQty(item.id)}
                   >
                     −
@@ -120,7 +119,7 @@ export function ProductTile({
                     {qty}
                   </span>
                   <button
-                    className="h-8 w-8 rounded-lg border hover:bg-black/5 disabled:opacity-50"
+                    className="h-8 w-8 rounded-lg hover:bg-black/5 disabled:opacity-50"
                     onClick={() => increaseQty(item.id)}
                     disabled={!canIncrease(item.id)}
                   >
@@ -140,7 +139,6 @@ export function ProductTile({
      ========================= */
   return (
     <div className="h-full min-h-[460px] w-full rounded-xl border border-gray-200 bg-white flex flex-col hover:shadow-sm transition-shadow">
-      {/* IMAGE (dominates height) */}
       <div className="relative w-full h-[340px] shrink-0">
         <Image
           src={src}
@@ -152,7 +150,6 @@ export function ProductTile({
         />
       </div>
 
-      {/* CONTENT (auto height, no growth) */}
       <div className="px-3 py-2 flex flex-col gap-1">
         <div className="text-sm font-medium leading-snug line-clamp-2">
           {item.name}
@@ -188,5 +185,4 @@ export function ProductTile({
       </div>
     </div>
   );
-
 }

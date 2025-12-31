@@ -4,7 +4,6 @@ export async function apiRequest(
   endpoint: string,
   options: RequestInit = {}
 ) {
-
   const token =
     typeof window !== "undefined"
       ? localStorage.getItem("token")
@@ -23,13 +22,7 @@ export async function apiRequest(
 
   /* ============================================================
      AUTH FAILURE HANDLING (401)
-     ============================================================
-     - Any 401 is treated as "user must authenticate"
-     - Redirects to login
-     - Preserves current path so user can resume flow
-     - Throws to stop downstream logic
      ============================================================ */
-
   if (res.status === 401) {
     if (typeof window !== "undefined") {
       const next = encodeURIComponent(window.location.pathname);
@@ -38,10 +31,23 @@ export async function apiRequest(
     throw new Error("Unauthorized");
   }
 
-  const data = await res.json().catch(() => ({}));
+  /* ============================================================
+     SAFE RESPONSE PARSING
+     - Supports JSON, empty bodies, 204 No Content
+     ============================================================ */
+  let data: any = {};
+
+  const contentType = res.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
+    try {
+      data = await res.json();
+    } catch {
+      data = {};
+    }
+  }
 
   if (!res.ok) {
-    throw new Error(data.error || "API request failed");
+    throw new Error(data?.error || "API request failed");
   }
 
   return data;

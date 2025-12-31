@@ -28,7 +28,7 @@ function emptyBox(isAdmin: boolean, onAdd?: () => void) {
     return (
       <button
         onClick={onAdd}
-        className="w-full h-full rounded-2xl border border-dashed bg-white hover:bg-black/5 flex items-center justify-center"
+        className="w-full h-full rounded-2xl border border-gray-200 border-dashed bg-white hover:bg-black/5 flex items-center justify-center"
       >
         <span className="text-2xl font-light text-gray-700">+</span>
       </button>
@@ -36,7 +36,7 @@ function emptyBox(isAdmin: boolean, onAdd?: () => void) {
   }
 
   return (
-    <div className="w-full h-full rounded-2xl border bg-white/60" />
+    <div className="w-full h-full rounded-2xl border border-gray-200 bg-white/60" />
   );
 }
 
@@ -111,7 +111,6 @@ export function FeaturedGrid({
     );
   };
 
-
   /* ---------- GROUP TILE (2x2) ---------- */
   const renderGroup = (slot: FeaturedSlot) => {
     const positions: (1 | 2 | 3 | 4)[] = [1, 2, 3, 4];
@@ -147,7 +146,6 @@ export function FeaturedGrid({
       </div>
     );
   };
-
 
   /* =========================
      RENDER

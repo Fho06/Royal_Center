@@ -3,7 +3,11 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 
-type CartItem = {
+/* =========================
+   TYPES
+   ========================= */
+
+export type CartItem = {
   item_id: string;
   name: string;
   price: number;
@@ -14,14 +18,30 @@ type CartItem = {
 type CartContextType = {
   cart: CartItem[];
   setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
+
+  cartQty: (itemId: string) => number;
+  remainingStock: (item: { id: string; stock: number }) => number;
+
+  addToCart: (item: {
+    id: string;
+    name: string;
+    price_usd: number;
+    stock: number;
+  }) => void;
+
+  increaseQty: (itemId: string) => void;
+  decreaseQty: (itemId: string) => void;
+
+  canIncrease: (itemId: string) => boolean;
+
   clearCart: () => void;
 };
 
 const CartContext = createContext<CartContextType | null>(null);
 
-/* ============================================================
+/* =========================
    STORAGE KEY
-   ============================================================ */
+   ========================= */
 
 function getCartStorageKey(userId?: number) {
   return userId
@@ -29,27 +49,26 @@ function getCartStorageKey(userId?: number) {
     : "royal_center_cart_guest";
 }
 
+/* =========================
+   PROVIDER
+   ========================= */
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
-  // storageKey must NOT change during hydration
   const storageKeyRef = useRef<string | null>(null);
 
-  /* ============================================================
-     HYDRATION BARRIER
-     ============================================================ */
+  /* ---------- HYDRATION ---------- */
 
   useEffect(() => {
     storageKeyRef.current = getCartStorageKey(user?.userId);
     setHydrated(true);
   }, [user?.userId]);
 
-  /* ============================================================
-     LOAD CART (CLIENT ONLY)
-     ============================================================ */
+  /* ---------- LOAD ---------- */
 
   useEffect(() => {
     if (!hydrated || !storageKeyRef.current) return;
@@ -68,14 +87,87 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [hydrated]);
 
-  /* ============================================================
-     PERSIST CART (CLIENT ONLY)
-     ============================================================ */
+  /* ---------- PERSIST ---------- */
 
   useEffect(() => {
     if (!hydrated || !storageKeyRef.current) return;
     localStorage.setItem(storageKeyRef.current, JSON.stringify(cart));
   }, [cart, hydrated]);
+
+  /* =========================
+     CART HELPERS (🔥 MOVED HERE)
+     ========================= */
+
+  function cartQty(itemId: string) {
+    return cart.find(c => c.item_id === itemId)?.quantity || 0;
+  }
+
+  function remainingStock(item: { id: string; stock: number }) {
+    const cartItem = cart.find(c => c.item_id === item.id);
+    if (!cartItem) return item.stock;
+    return cartItem.stock - cartItem.quantity;
+  }
+
+
+  function canIncrease(itemId: string) {
+    const cartItem = cart.find(c => c.item_id === itemId);
+    if (!cartItem) return true; // not in cart yet → can add
+    return cartItem.quantity < cartItem.stock;
+  }
+
+  function addToCart(item: {
+    id: string;
+    name: string;
+    price_usd: number;
+    stock: number;
+  }) {
+    setCart(prev => {
+      const existing = prev.find(c => c.item_id === item.id);
+
+      if (existing) {
+        if (existing.quantity >= existing.stock) return prev;
+
+        return prev.map(c =>
+          c.item_id === item.id
+            ? { ...c, quantity: c.quantity + 1 }
+            : c
+        );
+      }
+
+      return [
+        ...prev,
+        {
+          item_id: item.id,
+          name: item.name,
+          price: item.price_usd,
+          quantity: 1,
+          stock: item.stock,
+        },
+      ];
+    });
+  }
+
+  function increaseQty(itemId: string) {
+    setCart(prev =>
+      prev.map(c =>
+        c.item_id === itemId && c.quantity < c.stock
+          ? { ...c, quantity: c.quantity + 1 }
+          : c
+      )
+    );
+  }
+
+  function decreaseQty(itemId: string) {
+    setCart(prev =>
+      prev
+        .map(c =>
+          c.item_id === itemId
+            ? { ...c, quantity: c.quantity - 1 }
+            : c
+        )
+        .filter(c => c.quantity > 0)
+    );
+  }
 
   function clearCart() {
     if (!storageKeyRef.current) return;
@@ -84,16 +176,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <CartContext.Provider value={{ cart, setCart, clearCart }}>
+    <CartContext.Provider
+      value={{
+        cart,
+        setCart,
+        cartQty,
+        remainingStock,
+        addToCart,
+        increaseQty,
+        decreaseQty,
+        canIncrease,
+        clearCart,
+      }}
+    >
       {children}
     </CartContext.Provider>
   );
 }
 
+/* =========================
+   HOOK
+   ========================= */
+
 export function useCart() {
-  const context = useContext(CartContext);
-  if (!context) {
+  const ctx = useContext(CartContext);
+  if (!ctx) {
     throw new Error("useCart must be used within CartProvider");
   }
-  return context;
+  return ctx;
 }

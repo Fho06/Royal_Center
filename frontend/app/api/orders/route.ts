@@ -11,7 +11,7 @@ function getUserFromRequest(req: Request) {
     return jwt.verify(
       auth.replace("Bearer ", ""),
       process.env.JWT_SECRET!
-    ) as { userId: number; role?: string };
+    ) as { userId: number };
   } catch {
     return null;
   }
@@ -80,7 +80,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { items } = await req.json();
+    const {
+      items,
+      address_id,
+      fulfillment_type = "delivery",
+      tip_amount = 0,
+      payment_method = "pagomovil",
+      notes = null,
+    } = await req.json();
+
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: "No items provided" },
@@ -88,17 +96,56 @@ export async function POST(req: Request) {
       );
     }
 
-    const TAX_RATE = 0.16;
+    if (!["delivery", "pickup"].includes(fulfillment_type)) {
+      return NextResponse.json(
+        { error: "Invalid fulfillment type" },
+        { status: 400 }
+      );
+    }
 
+    if (fulfillment_type === "delivery" && !address_id) {
+      return NextResponse.json(
+        { error: "Address required for delivery" },
+        { status: 400 }
+      );
+    }
+
+    const TAX_RATE = 0.16;
     const pool = await getPool();
     const tx = new sql.Transaction(pool);
     await tx.begin();
 
     try {
+      let address: any = null;
+
+      /* ===============================
+         VALIDATE ADDRESS (DELIVERY ONLY)
+         =============================== */
+      if (fulfillment_type === "delivery") {
+        const addressRes = await tx
+          .request()
+          .input("address_id", sql.Int, address_id)
+          .input("user_id", sql.Int, user.userId)
+          .query(`
+            SELECT *
+            FROM user_addresses
+            WHERE address_id = @address_id
+              AND user_id = @user_id
+          `);
+
+        if (addressRes.recordset.length === 0) {
+          throw new Error("Invalid address");
+        }
+
+        address = addressRes.recordset[0];
+      }
+
       let subtotal = 0;
       let taxAmount = 0;
 
-      // 1️⃣ Validate + calculate totals
+      /* ===============================
+         VALIDATE ITEMS + TOTALS
+         =============================== */
       for (const item of items) {
         const res = await tx
           .request()
@@ -127,21 +174,37 @@ export async function POST(req: Request) {
         }
       }
 
-      const totalAmount = subtotal + taxAmount;
+      /* =========================================================
+         BUSINESS RULE
+         subtotal IS the final amount charged
+         ========================================================= */
+      const totalAmount = subtotal + Number(tip_amount || 0);
 
-      // 2️⃣ Create order
+      /* ===============================
+         CREATE ORDER
+         =============================== */
       const orderRes = await tx
         .request()
         .input("user_id", sql.Int, user.userId)
         .input("subtotal", sql.Decimal(10, 2), subtotal)
         .input("tax", sql.Decimal(10, 2), taxAmount)
         .input("total", sql.Decimal(10, 2), totalAmount)
+        .input("address_id", sql.Int, address_id ?? null)
+        .input("fulfillment_type", sql.VarChar, fulfillment_type)
+        .input("tip_amount", sql.Decimal(10, 2), tip_amount)
+        .input("payment_method", sql.VarChar, payment_method)
+        .input("notes", sql.NVarChar, notes)
         .query(`
           INSERT INTO orders (
             user_id,
             subtotal,
             tax_amount,
             total_amount,
+            address_id,
+            fulfillment_type,
+            tip_amount,
+            payment_method,
+            notes,
             status
           )
           OUTPUT INSERTED.id
@@ -150,13 +213,20 @@ export async function POST(req: Request) {
             @subtotal,
             @tax,
             @total,
+            @address_id,
+            @fulfillment_type,
+            @tip_amount,
+            @payment_method,
+            @notes,
             'pending_payment'
           )
         `);
 
       const orderId = orderRes.recordset[0].id;
 
-      // 3️⃣ Snapshot order items
+      /* ===============================
+         SNAPSHOT ITEMS
+         =============================== */
       for (const item of items) {
         const itemRes = await tx
           .request()
@@ -176,11 +246,7 @@ export async function POST(req: Request) {
           .input("quantity", sql.Int, item.quantity)
           .input("price", sql.Decimal(10, 2), dbItem.price_usd)
           .input("is_tax_exempt", sql.Bit, dbItem.is_tax_exempt)
-          .input(
-            "tax_rate",
-            sql.Decimal(5, 4),
-            dbItem.is_tax_exempt ? 0 : TAX_RATE
-          )
+          .input("tax_rate", sql.Decimal(5, 4), 0)
           .query(`
             INSERT INTO order_items (
               order_id,
@@ -201,16 +267,58 @@ export async function POST(req: Request) {
           `);
       }
 
+      /* ===============================
+         SNAPSHOT ADDRESS (DELIVERY ONLY, NON-BLOCKING)
+         =============================== */
+      if (address) {
+        try {
+          await tx
+            .request()
+            .input("order_id", sql.Int, orderId)
+            .input("label", sql.VarChar, address.label)
+            .input("address_1", sql.VarChar, address.address_1)
+            .input("address_2", sql.VarChar, address.address_2)
+            .input("country", sql.VarChar, address.country)
+            .input("state", sql.VarChar, address.state)
+            .input("city", sql.VarChar, address.city)
+            .input("municipio", sql.VarChar, address.municipio)
+            .query(`
+              INSERT INTO order_addresses (
+                order_id,
+                label,
+                address_1,
+                address_2,
+                country,
+                state,
+                city,
+                municipio
+              )
+              VALUES (
+                @order_id,
+                @label,
+                @address_1,
+                @address_2,
+                @country,
+                @state,
+                @city,
+                @municipio
+              )
+            `);
+        } catch (e) {
+          console.warn("Order address snapshot failed:", e);
+        }
+      }
+
       await tx.commit();
       return NextResponse.json({ orderId });
     } catch (err) {
       await tx.rollback();
       throw err;
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error("Order create error:", err);
     return NextResponse.json(
-      { error: "Failed to create order" },
+      { error: err.message || "Failed to create order" },
       { status: 500 }
     );
   }

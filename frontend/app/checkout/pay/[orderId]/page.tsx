@@ -19,13 +19,19 @@ type PaymentAccount = {
   beneficiary_name: string | null;
 };
 
+const BANKS = [
+  "Banco de Venezuela",
+  "Banco Plaza",
+  "Banesco",
+  "Mercantil",
+  "Provincial",
+];
+
 export default function PagoMovilPage() {
   const router = useRouter();
   const params = useParams();
 
-  // 🔒 Freeze orderId ONCE (type-safe)
   const orderIdRef = useRef<string | null>(null);
-
   if (orderIdRef.current === null) {
     const raw = params.orderId;
     orderIdRef.current =
@@ -40,12 +46,11 @@ export default function PagoMovilPage() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [accounts, setAccounts] = useState<PaymentAccount[]>([]);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [senderBank, setSenderBank] = useState("");
   const [reference, setReference] = useState("");
-  const [amount, setAmount] = useState("");
   const [phoneLast4, setPhoneLast4] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -56,7 +61,7 @@ export default function PagoMovilPage() {
     }
 
     if (!orderId) {
-      setError("Invalid order ID");
+      setError("Orden inválida");
       setLoading(false);
       return;
     }
@@ -71,7 +76,7 @@ export default function PagoMovilPage() {
         setOrder(orderRes.order);
         setAccounts(accountsRes.accounts || []);
       } catch (e: any) {
-        setError(e.message || "Failed to load payment info");
+        setError(e.message || "Error cargando pago móvil");
       } finally {
         setLoading(false);
       }
@@ -83,8 +88,8 @@ export default function PagoMovilPage() {
   async function submitPayment() {
     if (!order) return;
 
-    if (!senderBank || !reference || !amount) {
-      setError("Please fill all required fields");
+    if (!senderBank || !reference) {
+      setError("Completa todos los campos requeridos");
       return;
     }
 
@@ -98,38 +103,33 @@ export default function PagoMovilPage() {
           order_id: order.id,
           sender_bank: senderBank,
           reference_number: reference,
-          amount: Number(amount),
+          amount: order.total_amount, // exact amount enforced
           phone_last4: phoneLast4 || undefined,
         }),
       });
-      setCart([]);
+
       router.push(`/orders/${order.id}`);
     } catch (e: any) {
-      setError(e.message || "Payment submission failed");
+      setError(e.message || "Error enviando el pago");
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (loading) {
-    return <div className="p-6">Loading payment details…</div>;
-  }
-
-  if (!order) {
-    return <div className="p-6 text-red-600">{error || "Order not found"}</div>;
-  }
+  if (loading) return <div className="p-6">Cargando pago móvil…</div>;
+  if (!order) return <div className="p-6 text-red-600">{error}</div>;
 
   const account = accounts[0];
 
   return (
-    <main className="p-6 max-w-xl mx-auto space-y-6">
-      <button
-        onClick={() => router.back()}
-        className="text-sm text-gray-600 underline mb-4"
-      >
-        ← Back
-      </button>
+    <main className="max-w-6xl mx-auto p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Pago Móvil</h1>
+
+      {/* WARNING */}
+      <div className="flex items-center gap-3 rounded bg-yellow-50 border border-yellow-300 p-3 text-sm">
+        ⚠️ Debes realizar el pago por el <strong>monto exacto</strong> o la orden
+        no será procesada.
+      </div>
 
       {error && (
         <div className="rounded border border-red-400 bg-red-50 p-3 text-red-700">
@@ -137,65 +137,91 @@ export default function PagoMovilPage() {
         </div>
       )}
 
-      <div className="border rounded p-4 space-y-1">
-        <p><strong>Order ID:</strong> {order.id}</p>
-        <p><strong>Total:</strong> ${order.total_amount.toFixed(2)}</p>
-        <p><strong>Status:</strong> {order.status}</p>
-      </div>
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* STEP 1 */}
+        <section className="border rounded">
+          <div className="bg-gray-50 border-b px-4 py-2 font-medium flex gap-2">
+            <span className="w-6 h-6 rounded-full bg-black text-white flex items-center justify-center text-sm">
+              1
+            </span>
+            Completa los datos de la cuenta con la que pagaste
+          </div>
 
-      {account && (
-        <div className="border rounded p-4 space-y-1">
-          <p><strong>Bank:</strong> {account.bank_name}</p>
-          <p><strong>Phone:</strong> {account.phone}</p>
-          <p><strong>RIF:</strong> {account.rif}</p>
-          {account.beneficiary_name && (
-            <p><strong>Name:</strong> {account.beneficiary_name}</p>
-          )}
-        </div>
-      )}
+          <div className="p-4 space-y-4">
+            <select
+              value={senderBank}
+              onChange={(e) => setSenderBank(e.target.value)}
+              className="w-full border rounded px-3 py-2"
+            >
+              <option value="">Selecciona tu banco</option>
+              {BANKS.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
 
-      <div className="border rounded p-4 space-y-3">
-        <input
-          placeholder="Sender bank"
-          value={senderBank}
-          onChange={e => setSenderBank(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-        />
+            <input
+              placeholder="Referencia / N° de operación"
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              className="w-full border rounded px-3 py-2"
+            />
 
-        <input
-          placeholder="Reference number"
-          value={reference}
-          onChange={e => setReference(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-        />
+            <input
+              placeholder="Últimos 4 dígitos del teléfono (opcional)"
+              value={phoneLast4}
+              onChange={(e) => setPhoneLast4(e.target.value)}
+              className="w-full border rounded px-3 py-2"
+            />
+          </div>
+        </section>
 
-        <input
-          placeholder="Amount"
-          type="number"
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-        />
+        {/* STEP 2 */}
+        <section className="border rounded">
+          <div className="bg-gray-50 border-b px-4 py-2 font-medium flex gap-2">
+            <span className="w-6 h-6 rounded-full bg-black text-white flex items-center justify-center text-sm">
+              2
+            </span>
+            Datos para realizar el pago móvil
+          </div>
 
-        <input
-          placeholder="Phone last 4 digits (optional)"
-          value={phoneLast4}
-          onChange={e => setPhoneLast4(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-        />
+          <div className="p-4 space-y-2 text-sm">
+            <p>
+              <strong>Monto:</strong>{" "}
+              Bs. {order.total_amount.toFixed(2)}
+            </p>
 
-        <button
-          disabled={submitting}
-          onClick={submitPayment}
-          className="w-full bg-black text-white py-2 rounded disabled:opacity-50"
-        >
-          Submit Payment
-        </button>
+            {account && (
+              <>
+                <p>
+                  <strong>Banco:</strong> {account.bank_name}
+                </p>
+                <p>
+                  <strong>Teléfono:</strong> {account.phone}
+                </p>
+                <p>
+                  <strong>RIF:</strong> {account.rif}
+                </p>
+                {account.beneficiary_name && (
+                  <p>
+                    <strong>Beneficiario:</strong>{" "}
+                    {account.beneficiary_name}
+                  </p>
+                )}
+              </>
+            )}
+
+            <button
+              disabled={submitting}
+              onClick={submitPayment}
+              className="mt-4 w-full bg-black text-white py-2 rounded font-medium disabled:opacity-50"
+            >
+              Ya realicé el pago
+            </button>
+          </div>
+        </section>
       </div>
     </main>
   );
 }
-function setCart(arg0: never[]) {
-  throw new Error("Function not implemented.");
-}
-
