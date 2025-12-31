@@ -107,13 +107,13 @@ export default function OrderDetailsPage() {
             }}
             className="text-blue-600 underline text-sm"
           >
-            Edit Order
+            Editar Orden
           </button>
         )}
       </div>
       <div>
         <h1 className="text-2xl font-bold">
-          Order #{order.id}
+          Orden #{order.id}
         </h1>
 
         <p className="text-sm text-gray-500">

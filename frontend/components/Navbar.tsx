@@ -44,7 +44,7 @@ export default function Navbar() {
   const { cart, setCart } = useCart();
 
   /* =========================
-     MOUNTED GUARD (🔥 FIX)
+     MOUNTED GUARD
      ========================= */
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -85,7 +85,6 @@ export default function Navbar() {
       }
     }
 
-    // only run on client after mount (localStorage)
     if (mounted) load();
   }, [isAuthenticated, mounted]);
 
@@ -121,9 +120,6 @@ export default function Navbar() {
     router.push(`/?search=${encodeURIComponent(q)}`);
   }
 
-  /* =========================
-     SEARCH KEYBOARD NAV
-     ========================= */
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (!showHistory) {
       if (e.key === "Enter") submitSearch(search);
@@ -170,28 +166,42 @@ export default function Navbar() {
      CART PREVIEW
      ========================= */
   const [cartOpen, setCartOpen] = useState(false);
-  const closeTimer = useRef<NodeJS.Timeout | null>(null);
+  const cartTimer = useRef<NodeJS.Timeout | null>(null);
 
   function openCart() {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
+    if (cartTimer.current) clearTimeout(cartTimer.current);
     setCartOpen(true);
   }
 
   function closeCart() {
-    closeTimer.current = setTimeout(() => {
+    cartTimer.current = setTimeout(() => {
       setCartOpen(false);
     }, 150);
   }
 
   const total = cart.reduce((sum, it) => sum + it.price * it.quantity, 0);
 
+  /* =========================
+     PROFILE DROPDOWN
+     ========================= */
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileTimer = useRef<NodeJS.Timeout | null>(null);
+
+  function openProfile() {
+    if (profileTimer.current) clearTimeout(profileTimer.current);
+    setProfileOpen(true);
+  }
+
+  function closeProfile() {
+    profileTimer.current = setTimeout(() => {
+      setProfileOpen(false);
+    }, 150);
+  }
+
   function handleLogout() {
     logout();
   }
 
-  /* =========================
-     IMPORTANT: mounted guard AFTER hooks
-     ========================= */
   if (!mounted) return null;
 
   /* =========================
@@ -228,7 +238,6 @@ export default function Navbar() {
             </button>
           </div>
 
-          {/* SEARCH HISTORY */}
           {showHistory && history.length > 0 && (
             <div className="absolute left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50">
               {history.map((item, i) => (
@@ -259,14 +268,51 @@ export default function Navbar() {
         <div className="flex items-center gap-6 ml-auto order-2 lg:order-3">
           {isAuthenticated ? (
             <>
-              <Link href="/orders">Ordenes</Link>
               {isAdmin && (
                 <>
                   <Link href="/admin/orders">Admin Orders</Link>
                   <Link href="/admin/payments">Admin Payments</Link>
                 </>
               )}
-              <button onClick={handleLogout}>Salir</button>
+
+              {/* PERFIL */}
+              <div
+                className="relative"
+                onMouseEnter={openProfile}
+                onMouseLeave={closeProfile}
+              >
+                <button
+                  onClick={() => router.push("/account")}
+                  className="font-medium hover:underline"
+                >
+                  Perfil
+                </button>
+
+                {profileOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border z-50">
+                    <Link
+                      href="/account"
+                      className="block px-4 py-2 hover:bg-black/5"
+                    >
+                      Cuenta de Perfil
+                    </Link>
+
+                    <Link
+                      href="/orders"
+                      className="block px-4 py-2 hover:bg-black/5"
+                    >
+                      Ordenes
+                    </Link>
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2 hover:bg-black/5 text-red-600"
+                    >
+                      Salir de Sesión
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <Link href="/login">Iniciar Sesión</Link>
@@ -298,7 +344,9 @@ export default function Navbar() {
                         .filter((it) => it.quantity > 0)
                     )
                   }
-                  remove={(id) => setCart((prev) => prev.filter((it) => it.item_id !== id))}
+                  remove={(id) =>
+                    setCart((prev) => prev.filter((it) => it.item_id !== id))
+                  }
                   canIncrease={() => true}
                 />
               </div>

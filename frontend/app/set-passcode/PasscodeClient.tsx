@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/app/context/AuthContext";
 
 export default function PasscodeClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { login } = useAuth();
 
-  // phone must be passed as ?phone=4121234567
-  const phone = searchParams.get("phone");
-
+  const phone = searchParams.get("phone"); // WITHOUT +58
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState("");
 
@@ -28,16 +28,38 @@ export default function PasscodeClient() {
       return;
     }
 
+    const raw = sessionStorage.getItem("register_draft");
+    if (!raw) {
+      setError("Registration session expired. Please register again.");
+      return;
+    }
+
+    const draft = JSON.parse(raw);
+
+    // Safety: prevent mismatched phones
+    if (draft.phone !== phone) {
+      setError("Phone mismatch. Please register again.");
+      return;
+    }
+
     try {
-      await apiRequest("/auth/set-passcode", {
+      const data = await apiRequest("/auth/register-complete", {
         method: "POST",
         body: JSON.stringify({
-          phone,
+          ...draft,
           passcode,
         }),
       });
 
-      router.push("/account");
+      // ✅ AUTO LOGIN
+      login(data.token);
+
+      sessionStorage.removeItem("register_draft");
+
+      const next = sessionStorage.getItem("register_next");
+      sessionStorage.removeItem("register_next");
+
+      router.push(next || "/account");
     } catch (err: any) {
       setError(err.message);
     }

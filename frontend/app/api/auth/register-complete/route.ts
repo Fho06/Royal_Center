@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { getPool, sql } from "@/lib/db";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 /* =========================
    HELPERS
    ========================= */
 function formatRIF(raw: string) {
   const cleaned = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
-
   if (cleaned.length < 9) return null;
 
   const letter = cleaned[0];
@@ -19,7 +20,7 @@ function formatRIF(raw: string) {
 export async function POST(req: Request) {
   try {
     const {
-      phone,
+      phone, // WITHOUT +58
       email,
       accountType,
       firstName,
@@ -28,12 +29,13 @@ export async function POST(req: Request) {
       companyName,
       rif,
       termsAccepted,
+      passcode, // 4 digits
     } = await req.json();
 
     /* =========================
-       BASE VALIDATION
+       BASIC VALIDATION
        ========================= */
-    if (!phone || !termsAccepted) {
+    if (!phone || !termsAccepted || !/^\d{4}$/.test(passcode)) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -47,31 +49,26 @@ export async function POST(req: Request) {
       );
     }
 
+    // normalize phone for DB
+    const fullPhone = `+58${phone}`;
+
     /* =========================
        ACCOUNT-TYPE VALIDATION
        ========================= */
     let formattedRif: string | null = null;
 
     if (accountType === "natural") {
-      if (
-        !firstName ||
-        !lastName ||
-        !["male", "female"].includes(gender)
-      ) {
+      if (!firstName || !lastName || !["male", "female"].includes(gender)) {
         return NextResponse.json(
-          {
-            error:
-              "Natural account requires first name, last name, and gender",
-          },
+          { error: "Natural requires first name, last name, and gender" },
           { status: 400 }
         );
       }
-    }
-
-    if (accountType === "juridico") {
+    } else {
+      // juridico
       if (!companyName || !rif) {
         return NextResponse.json(
-          { error: "Juridico account requires company name and RIF" },
+          { error: "Juridico requires company name and RIF" },
           { status: 400 }
         );
       }
@@ -86,13 +83,17 @@ export async function POST(req: Request) {
     }
 
     /* =========================
-       INSERT
+       HASH PASSCODE
        ========================= */
+    const passcodeHash = await bcrypt.hash(passcode, 10);
     const pool = await getPool();
 
-    await pool
+    /* =========================
+       INSERT USER + RETURN ID
+       ========================= */
+    const result = await pool
       .request()
-      .input("phone", sql.VarChar(15), phone)
+      .input("phone", sql.VarChar(15), fullPhone)
       .input("email", sql.VarChar(255), email || null)
       .input("account_type", sql.VarChar(10), accountType)
       .input("first_name", sql.VarChar(100), firstName || null)
@@ -100,9 +101,10 @@ export async function POST(req: Request) {
       .input("gender", sql.VarChar(6), gender || null)
       .input("company_name", sql.VarChar(255), companyName || null)
       .input("rif", sql.VarChar(15), formattedRif)
+      .input("passcode_hash", sql.VarChar(255), passcodeHash)
       .input("terms_accepted_at", sql.DateTime, new Date())
       .query(`
-        INSERT INTO users (
+        INSERT INTO dbo.users (
           phone,
           email,
           account_type,
@@ -111,9 +113,11 @@ export async function POST(req: Request) {
           gender,
           company_name,
           rif,
+          passcode_hash,
           otp_verified,
           terms_accepted_at
         )
+        OUTPUT INSERTED.user_id, INSERTED.role
         VALUES (
           @phone,
           @email,
@@ -123,13 +127,30 @@ export async function POST(req: Request) {
           @gender,
           @company_name,
           @rif,
+          @passcode_hash,
           1,
           @terms_accepted_at
         )
       `);
 
-    return NextResponse.json({ success: true });
+    const user = result.recordset[0];
+
+    /* =========================
+       ISSUE JWT
+       ========================= */
+    const token = jwt.sign(
+      {
+        userId: user.user_id,
+        role: user.role,
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: "7d" }
+    );
+
+    return NextResponse.json({ token });
+
   } catch (err: any) {
+    // unique constraint (phone or rif)
     if (err?.number === 2627) {
       return NextResponse.json(
         { error: "Account already exists" },
@@ -137,7 +158,7 @@ export async function POST(req: Request) {
       );
     }
 
-    console.error("Register error:", err);
+    console.error("Register-complete error:", err);
     return NextResponse.json(
       { error: "Registration failed" },
       { status: 500 }

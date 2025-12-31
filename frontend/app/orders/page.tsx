@@ -23,11 +23,11 @@ export default function OrdersPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    // ⛔ wait for auth resolution
     if (authLoading) return;
 
     if (!isAuthenticated) {
-      setOrders([]);
-      setLoading(false);
+      router.push("/login");
       return;
     }
 
@@ -50,9 +50,9 @@ export default function OrdersPage() {
     }
 
     load();
-  }, [status, authLoading, isAuthenticated]);
+  }, [status, authLoading, isAuthenticated, router]);
 
-  if (loading) {
+  if (authLoading || loading) {
     return <div className="p-6">Loading orders…</div>;
   }
 
@@ -62,14 +62,14 @@ export default function OrdersPage() {
 
   return (
     <main className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Orders</h1>
+      <h1 className="text-2xl font-bold mb-4">Ordenes</h1>
 
       <select
         value={status}
         onChange={(e) => setStatus(e.target.value)}
         className="border rounded px-3 py-2 mb-4"
       >
-        <option value="all">All</option>
+        <option value="all">Todas</option>
         <option value="under_review">En Revisión</option>
         <option value="order_placed">Pedido Realizado</option>
         <option value="picking_up">Buscando Tu Orden</option>
@@ -78,7 +78,7 @@ export default function OrdersPage() {
       </select>
 
       {orders.length === 0 && (
-        <p className="text-gray-500">No orders found.</p>
+        <p className="text-gray-500">No tienes órdenes aún.</p>
       )}
 
       <div className="space-y-4">
@@ -88,8 +88,8 @@ export default function OrdersPage() {
             onClick={() => router.push(`/orders/${order.id}`)}
             className="border rounded p-4 cursor-pointer hover:bg-gray-50"
           >
-            <p className="font-semibold">Order #{order.id}</p>
-            <p>Status: {order.status_label}</p>
+            <p className="font-semibold">Orden #{order.id}</p>
+            <p>Estado: {order.status_label}</p>
             <p>Total: ${order.total_amount.toFixed(2)}</p>
             <p className="text-sm text-gray-500">
               {new Date(order.created_at).toLocaleString()}
