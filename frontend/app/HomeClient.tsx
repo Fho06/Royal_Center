@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCart } from "@/app/context/CartContext";
 import { useItems } from "./(shop)/hooks/UseItems";
-import { useCategories } from "./(shop)/hooks/UseCategories";
 import { ProductList } from "./(shop)/components/ProductList";
 import { Pagination } from "./(shop)/components/Pagination";
 import { useAuth } from "@/app/context/AuthContext";
-import { Item } from "./(shop)/types";
 import {
   FeaturedGrid,
   type FeaturedMap,
@@ -32,8 +30,8 @@ type ActivePick = {
 export default function HomeClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const {
-    cart,
     cartQty,
     remainingStock,
     addToCart,
@@ -55,15 +53,25 @@ export default function HomeClient() {
   const [currentPage, setCurrentPage] = useState(1);
 
   /* =========================
-     FILTER STATE (SEARCH ONLY)
+     DRAFT FILTERS (UI ONLY)
+     ========================= */
+  const [draftCategoryIds, setDraftCategoryIds] = useState<number[]>([]);
+  const [draftSubcategoryIds, setDraftSubcategoryIds] = useState<number[]>([]);
+  const [draftInStockOnly, setDraftInStockOnly] = useState(true);
+  const [draftPriceRange, setDraftPriceRange] =
+    useState<[number, number] | null>(null);
+
+  /* =========================
+     APPLIED FILTERS (USED FOR FETCH)
      ========================= */
   const [categoryIds, setCategoryIds] = useState<number[]>([]);
   const [subcategoryIds, setSubcategoryIds] = useState<number[]>([]);
   const [inStockOnly, setInStockOnly] = useState(true);
-  const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
+  const [priceRange, setPriceRange] =
+    useState<[number, number] | null>(null);
 
   /* =========================
-     URL → STATE
+     URL → STATE (search/page only, like your current behavior)
      ========================= */
   useEffect(() => {
     if (!hydrated) return;
@@ -72,7 +80,7 @@ export default function HomeClient() {
   }, [hydrated, searchParams]);
 
   /* =========================
-     STATE → URL
+     STATE → URL (search/page only, like your current behavior)
      ========================= */
   useEffect(() => {
     if (!hydrated) return;
@@ -82,7 +90,7 @@ export default function HomeClient() {
     if (search) url.searchParams.set("search", search);
     else url.searchParams.delete("search");
 
-    url.searchParams.set("page", currentPage.toString());
+    url.searchParams.set("page", String(currentPage));
 
     router.replace(url.pathname + "?" + url.searchParams.toString(), {
       scroll: false,
@@ -91,21 +99,58 @@ export default function HomeClient() {
 
   /* =========================
      RESET FILTERS ON NEW SEARCH
+     (resets BOTH draft + applied)
      ========================= */
   useEffect(() => {
     if (!hydrated) return;
 
+    // draft
+    setDraftCategoryIds([]);
+    setDraftSubcategoryIds([]);
+    setDraftPriceRange(null);
+    setDraftInStockOnly(true);
+
+    // applied
     setCategoryIds([]);
     setSubcategoryIds([]);
     setPriceRange(null);
     setInStockOnly(true);
+
     setCurrentPage(1);
   }, [hydrated, search]);
 
   /* =========================
-     DATA
+     APPLY / CLEAR (ONLY TIME APPLIED STATE CHANGES)
      ========================= */
-  const { items, total, priceBounds, error } = useItems({
+  function applyFilters() {
+    setCategoryIds(draftCategoryIds);
+    setSubcategoryIds(draftSubcategoryIds);
+    setInStockOnly(draftInStockOnly);
+    setPriceRange(draftPriceRange);
+    setCurrentPage(1);
+  }
+
+  function clearFilters() {
+    // draft
+    setDraftCategoryIds([]);
+    setDraftSubcategoryIds([]);
+    setDraftInStockOnly(true);
+    setDraftPriceRange(null);
+
+    // applied
+    setCategoryIds([]);
+    setSubcategoryIds([]);
+    setInStockOnly(true);
+    setPriceRange(null);
+
+    setCurrentPage(1);
+  }
+
+  /* =========================
+     DATA (FACETS COME FROM SERVER)
+     IMPORTANT: uses APPLIED filters only
+     ========================= */
+  const { items, total, priceBounds, facets, error } = useItems({
     search,
     categoryIds,
     subcategoryIds,
@@ -116,43 +161,10 @@ export default function HomeClient() {
   });
 
   const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const isSearching = search.trim().length > 0;
 
   /* =========================
-     FACETS (CRITICAL FIX)
-     ========================= */
-  const categories = useCategories();
-
-  const facets = useMemo(() => {
-    if (!items.length || !categories.length) return null;
-
-    const subIds = new Set<number>();
-    const catIds = new Set<number>();
-
-    for (const item of items) {
-      if (item.category_id != null) {
-        subIds.add(item.category_id);
-      }
-    }
-
-    for (const c of categories) {
-      if (
-        c.level === 2 &&
-        subIds.has(c.id) &&
-        c.parent_id != null
-      ) {
-        catIds.add(c.parent_id);
-      }
-    }
-
-    return {
-      categories: Array.from(catIds),
-      subcategories: Array.from(subIds),
-    };
-  }, [items, categories]);
-
-
-  /* =========================
-     FEATURED
+     FEATURED (UNCHANGED)
      ========================= */
   const [featured, setFeatured] = useState<FeaturedMap>({});
   const [modalOpen, setModalOpen] = useState(false);
@@ -204,15 +216,11 @@ export default function HomeClient() {
     await loadFeatured();
   }
 
-  const isSearching = search.trim().length > 0;
-
   /* =========================
      RENDER
      ========================= */
-     //px = mobile, md = tablet, lg = desktop
   return (
     <div className="overflow-x-hidden">
-      {/* CONTAINED PAGE CONTENT */}
       <main className="app-shell py-6 space-y-6">
         {!isSearching && (
           <FeaturedGrid
@@ -235,22 +243,24 @@ export default function HomeClient() {
         {isSearching && (
           <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
             <SearchFilters
-              facets={facets}
+              facets={facets ?? null}
               priceBounds={priceBounds}
-              priceRange={priceRange}
-              setPriceRange={setPriceRange}
-              categoryIds={categoryIds}
-              setCategoryIds={setCategoryIds}
-              subcategoryIds={subcategoryIds}
-              setSubcategoryIds={setSubcategoryIds}
-              inStockOnly={inStockOnly}
-              setInStockOnly={setInStockOnly}
+              // DRAFT goes to UI
+              priceRange={draftPriceRange}
+              setPriceRange={setDraftPriceRange}
+              categoryIds={draftCategoryIds}
+              setCategoryIds={setDraftCategoryIds}
+              subcategoryIds={draftSubcategoryIds}
+              setSubcategoryIds={setDraftSubcategoryIds}
+              inStockOnly={draftInStockOnly}
+              setInStockOnly={setDraftInStockOnly}
+              // ACTIONS
+              onApply={applyFilters}
+              onClear={clearFilters}
             />
 
             <div className="space-y-4">
-              <h2 className="pt-1 pb-7 text-2xl font-semibold">
-                Resultados
-              </h2>
+              <h2 className="pt-1 pb-7 text-2xl font-semibold">Resultados</h2>
 
               <ProductList
                 items={items}
@@ -272,9 +282,7 @@ export default function HomeClient() {
                 }
               />
 
-              {error && (
-                <p className="text-red-600 text-sm">{error}</p>
-              )}
+              {error && <p className="text-red-600 text-sm">{error}</p>}
             </div>
           </div>
         )}
@@ -289,11 +297,7 @@ export default function HomeClient() {
             onPick={async (item) => {
               if (!activePick) return;
               setModalOpen(false);
-              await assignFeatured(
-                activePick.slot,
-                activePick.position,
-                item.id
-              );
+              await assignFeatured(activePick.slot, activePick.position, item.id);
               setActivePick(null);
             }}
           />

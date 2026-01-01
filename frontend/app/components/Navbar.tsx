@@ -191,7 +191,7 @@ export default function Navbar() {
             {/* BRAND */}
             <Link
               href="/"
-              className="navbar-brand text-4xl font-serif whitespace-nowrap order-1"
+              className="navbar-brand sm: text-2xl lg:text-4xl font-serif whitespace-nowrap order-1"
             >
               Royal Center
             </Link>
@@ -245,7 +245,7 @@ export default function Navbar() {
             </div>
 
             {/* RIGHT */}
-            <div className="flex items-center gap-6 ml-auto order-2 lg:order-3">
+            <div className="flex items-center gap-6 sm:text-md lg:text-xl ml-auto order-2 lg:order-3">
               {isAuthenticated ? (
                 <>
                   {isAdmin && (
@@ -263,7 +263,7 @@ export default function Navbar() {
                     <button className="hover:underline">Perfil</button>
 
                     {profileOpen && (
-                      <div className="navbar-dropdown absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border z-50">
+                      <div className="navbar-dropdown absolute right-0 mt-2 w-48 bg-white rounded-xl elevation-xl">
                         <Link href="/account" className="block px-4 py-2 hover:bg-black/5">
                           Cuenta de Perfil
                         </Link>
