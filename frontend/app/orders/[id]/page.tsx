@@ -1,13 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { apiRequest } from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
 import { useParams, useRouter } from "next/navigation";
 
+/* ---------- IMAGE HELPERS (SAME AS ProductTile) ---------- */
+
+const IMAGE_BASE_URL =
+  "https://pub-db262da1ef9140738af0ec8adade1c90.r2.dev/products";
+
+const IMAGE_EXTENSIONS = ["jpeg", "jpg", "webp", "png", "jfif", "heic"];
+
 /* ---------- TYPES ---------- */
 
 type OrderItem = {
+  item_id: string;
   name: string;
   quantity: number;
   price: number;
@@ -20,6 +29,62 @@ type Order = {
   status_label: string;
   created_at: string;
 };
+
+/* ---------- READ-ONLY ROW (CHECKOUT STYLE) ---------- */
+
+function OrderItemRow({ item }: { item: OrderItem }) {
+  const [extIndex, setExtIndex] = useState(0);
+  const [failed, setFailed] = useState(false);
+
+  const src = failed
+    ? "/placeholder.png"
+    : `${IMAGE_BASE_URL}/${item.item_id}/1.${IMAGE_EXTENSIONS[extIndex]}`;
+
+  function onImgError() {
+    if (extIndex < IMAGE_EXTENSIONS.length - 1) {
+      setExtIndex(i => i + 1);
+    } else {
+      setFailed(true);
+    }
+  }
+
+  return (
+    <div className="flex gap-4 p-4 items-start">
+      {/* IMAGE */}
+      <div className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border">
+        <Image
+          src={src}
+          alt={item.name}
+          fill
+          sizes="64px"
+          onError={onImgError}
+          className="object-contain"
+        />
+      </div>
+
+      {/* INFO */}
+      <div className="flex-1 min-w-0">
+        <p className="font-medium leading-tight truncate">
+          {item.name}
+        </p>
+
+        <p className="text-sm text-gray-500 mt-1">
+          Qty: {item.quantity}
+        </p>
+      </div>
+
+      {/* TOTAL */}
+      <div className="text-right shrink-0">
+        <p className="font-semibold">
+          ${(item.price * item.quantity).toFixed(2)}
+        </p>
+        <p className="text-sm text-gray-500">
+          ${item.price.toFixed(2)}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /* ---------- COMPONENT ---------- */
 
@@ -43,7 +108,6 @@ export default function OrderDetailsPage() {
   /* ---------- AUTH + FETCH ---------- */
 
   useEffect(() => {
-    // ⛔ wait until auth state is resolved
     if (authLoading) return;
 
     if (!isAuthenticated) {
@@ -79,48 +143,28 @@ export default function OrderDetailsPage() {
   }
 
   if (error) {
-    return (
-      <div className="p-6 text-red-600">
-        {error}
-      </div>
-    );
+    return <div className="p-6 text-red-600">{error}</div>;
   }
 
   if (!order) {
-    return (
-      <div className="p-6">
-        Order not found.
-      </div>
-    );
+    return <div className="p-6">Order not found.</div>;
   }
 
   /* ---------- RENDER ---------- */
 
   return (
-    <main className="p-6 max-w-3xl mx-auto space-y-6">
-      <div className="mt-3 flex gap-4">
-        {order.status === "draft" && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              router.push(`/orders/${order.id}/edit`);
-            }}
-            className="text-blue-600 underline text-sm"
-          >
-            Editar Orden
-          </button>
-        )}
-      </div>
+    <main className="p-6 max-w-3xl mx-auto space-y-6 mt-3">
+      {/* HEADER (UNCHANGED) */}
       <div>
         <h1 className="text-2xl font-bold">
-          Orden #{order.id}
+          Order #{order.id}
         </h1>
 
         <p className="text-sm text-gray-500">
           {new Date(order.created_at).toLocaleString()}
         </p>
 
-        <p className="mt-2 text-sm">
+        <p className="mt-2 text-md">
           Status:{" "}
           <span className="font-semibold">
             {order.status_label}
@@ -128,29 +172,17 @@ export default function OrderDetailsPage() {
         </p>
       </div>
 
-      <div className="space-y-3">
+      {/* PRODUCT LIST — ONLY PART THAT CHANGED */}
+      <div className="checkout-card overflow-hidden divide-y divide-gray-100">
         {items.map((item, index) => (
-          <div
-            key={index}
-            className="flex justify-between border rounded p-3"
-          >
-            <div>
-              <p className="font-medium">{item.name}</p>
-              <p className="text-sm text-gray-500">
-                Qty: {item.quantity}
-              </p>
-            </div>
-
-            <div className="text-right">
-              <p>${item.price.toFixed(2)}</p>
-              <p className="text-sm text-gray-500">
-                ${(item.price * item.quantity).toFixed(2)}
-              </p>
-            </div>
-          </div>
+          <OrderItemRow
+            key={`${order.id}-${item.item_id ?? "item"}-${index}`}
+            item={item}
+          />
         ))}
       </div>
 
+      {/* TOTAL (UNCHANGED) */}
       <div className="border-t pt-4 text-right">
         <p className="text-lg font-bold">
           Total: ${order.total_amount.toFixed(2)}

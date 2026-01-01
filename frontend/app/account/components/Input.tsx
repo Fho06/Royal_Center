@@ -27,7 +27,7 @@ export function Input({
         placeholder={placeholder}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full rounded px-3 py-2 border ${
+        className={`w-full rounded-xl px-3 py-2 bg-white elevation-md ${
           error
             ? "border-red-500 placeholder-red-400"
             : "border-gray-300"

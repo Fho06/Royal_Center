@@ -207,13 +207,13 @@ export function AddressModal({
         <div className="flex gap-3 pt-2">
           <button
             onClick={close}
-            className="flex-1 border rounded py-2"
+            className="flex-1 bg-[var(--reg-accent-soft)] rounded py-2 elevation-md"
           >
             Cancelar
           </button>
           <button
             onClick={save}
-            className="flex-1 bg-black text-white rounded py-2"
+            className="flex-1 bg-[var(--reg-accent)] text-white rounded py-2 elevation-md"
           >
             Guardar
           </button>

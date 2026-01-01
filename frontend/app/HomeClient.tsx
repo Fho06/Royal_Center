@@ -15,6 +15,7 @@ import {
 import { AdminProductSearchModal } from "./(shop)/components/AdminProductSearchModal";
 import { SearchFilters } from "./(shop)/components/SearchFilters";
 
+
 const ITEMS_PER_PAGE = 20;
 
 function getToken() {
@@ -45,6 +46,7 @@ export default function HomeClient() {
 
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
 
   /* =========================
      SEARCH / PAGINATION
@@ -119,16 +121,44 @@ export default function HomeClient() {
     setCurrentPage(1);
   }, [hydrated, search]);
 
+  useEffect(() => {
+  if (!hydrated) return;
+
+  setIsLoadingResults(true);
+
+  const t = setTimeout(() => {
+    setIsLoadingResults(false);
+    }, 250);
+
+    return () => clearTimeout(t);
+  }, [
+    hydrated,
+    search,
+    currentPage,
+    categoryIds,
+    subcategoryIds,
+    inStockOnly,
+    priceRange,
+  ]);
+
+
   /* =========================
      APPLY / CLEAR (ONLY TIME APPLIED STATE CHANGES)
      ========================= */
   function applyFilters() {
+    setIsLoadingResults(true);
+
     setCategoryIds(draftCategoryIds);
     setSubcategoryIds(draftSubcategoryIds);
     setInStockOnly(draftInStockOnly);
     setPriceRange(draftPriceRange);
     setCurrentPage(1);
+
+    setTimeout(() => {
+      setIsLoadingResults(false);
+    }, 300);
   }
+
 
   function clearFilters() {
     // draft
@@ -259,7 +289,15 @@ export default function HomeClient() {
               onClear={clearFilters}
             />
 
-            <div className="space-y-4">
+            <div className="relative space-y-4">
+              {isLoadingResults && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl">
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-purple-600 border-t-transparent" />
+                    Buscando productos…
+                  </div>
+                </div>
+              )}
               <h2 className="pt-1 pb-7 text-2xl font-semibold">Resultados</h2>
 
               <ProductList

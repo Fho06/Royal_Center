@@ -110,7 +110,7 @@ export function ProductTile({
                 absolute top-2 right-2 z-20
                 ${plusSize}
                 flex items-center justify-center
-                rounded-full bg-[var(--navbar-accent)]
+                rounded-full bg-[var(--reg-accent)]
                 font-bold text-white
                 hover:brightness-95 disabled:opacity-60
               `}
@@ -125,7 +125,7 @@ export function ProductTile({
               className="
                 absolute top-2 right-2 z-20
                 flex items-center gap-1
-                rounded-full bg-[var(--navbar-accent-soft)]
+                rounded-full bg-[var(--navbar-accent)]
                 px-1.5 py-0.5
               "
               onClick={(e) => e.stopPropagation()}
@@ -136,6 +136,7 @@ export function ProductTile({
                   leading-none
                   translate-y-[0.5px]
                   text-white
+                  font-bold
                 `}
                 onClick={() => decreaseQty(item.id)}
               >
@@ -143,7 +144,7 @@ export function ProductTile({
               </button>
 
               <span
-                className={`w-3 text-center font-semibold text-white ${qtyTextSize}`}
+                className={`w-3 text-center pl-2 font-semibold text-white ${qtyTextSize}`}
               >
                 {qty}
               </span>
@@ -208,7 +209,7 @@ export function ProductTile({
           {item.name}
         </div>
 
-        <div className="text-sm sm:text-base font-semibold leading-tight">
+        <div className="text-md sm:text-base font-semibold leading-tight">
           ${item.price_usd.toFixed(2)}
         </div>
 
@@ -218,7 +219,7 @@ export function ProductTile({
             disabled={outOfStock}
             className="
               mt-0.5 w-fit rounded-lg
-              bg-[var(--navbar-accent)]
+              bg-[var(--reg-accent)]
               px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm
               font-semibold text-white
               hover:brightness-95 disabled:opacity-50

@@ -11,6 +11,9 @@
   /* Navbar */
   --navbar-accent: #aa70ec;
   --navbar-accent-soft: #bc8bff;
+
+  --reg-accent: #4e1d80;
+  --reg-accent-soft: #d8c3ed;
 }
 
 /* =========================
@@ -127,6 +130,23 @@ label {
   animation: slide-up 0.25s ease-out;
 }
 
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.25s ease-out;
+}
+
+
+
 /* =========================
    NAVBAR — BASE THEME
    ========================= */
@@ -232,7 +252,7 @@ label {
    ========================= */
 
 .cart-sidebar .checkout-btn {
-  background-color: var(--navbar-accent); /* your purple */
+  background-color: var(--navbar-accent);
   color: white !important;
   border: none !important;
   border-radius: 10px;
@@ -279,3 +299,76 @@ label {
     0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
+.reg-btn {
+  background-color: var(--reg-accent);
+  color: white;
+}
+
+.reg-btn:hover {
+  filter: brightness(0.95);
+}
+
+/*CARDS IN CHECKOUT*/
+
+.checkout-card {
+  background-color: white;
+  border-radius: 0.75rem;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.inside-card {
+  background-color: whitesmoke;
+  border-radius: 0.75rem;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* =========================
+   Sliders
+   ========================= */
+
+
+/* reset */
+.price-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  pointer-events: none; /* allows overlapping sliders */
+}
+
+/* track */
+.price-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--reg-accent); /* light purple track */
+  border-radius: 999px;
+}
+
+.price-slider::-moz-range-track {
+  height: 6px;
+  background: var(--reg-accent);
+  border-radius: 999px;
+}
+
+/* thumb */
+.price-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 16px;
+  width: 16px;
+  background: var(--reg-accent);
+  border-radius: 50%;
+  margin-top: -5px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.price-slider::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  background: var(--reg-accent);
+  border-radius: 50%;
+  pointer-events: auto;
+  cursor: pointer;
+}
