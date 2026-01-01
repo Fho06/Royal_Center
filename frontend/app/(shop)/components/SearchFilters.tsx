@@ -14,191 +14,201 @@ type Props = {
     max: number | null;
   } | null;
 
-  priceRange: [number, number] | null;
-  setPriceRange: (v: [number, number] | null) => void;
-
+  // DRAFT FILTER STATE (UI ONLY)
   categoryIds: number[];
   setCategoryIds: (v: number[]) => void;
   subcategoryIds: number[];
   setSubcategoryIds: (v: number[]) => void;
   inStockOnly: boolean;
   setInStockOnly: (v: boolean) => void;
+  priceRange: [number, number] | null;
+  setPriceRange: (v: [number, number] | null) => void;
+
+  // ACTIONS (REQUIRED)
+  onApply: () => void;
+  onClear: () => void;
 };
 
 export function SearchFilters({
   facets,
   priceBounds,
-  priceRange,
-  setPriceRange,
   categoryIds,
   setCategoryIds,
   subcategoryIds,
   setSubcategoryIds,
   inStockOnly,
   setInStockOnly,
-  
+  priceRange,
+  setPriceRange,
+  onApply,
+  onClear,
 }: Props) {
   const categories = useCategories();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
+  // normalize bounds for TS + safety
+  const minPrice = priceBounds?.min ?? 0;
+  const maxPrice = priceBounds?.max ?? 0;
+
+  /* =========================
+     VISIBILITY LOGIC (NEVER HIDE OPTIONS)
+     ========================= */
   const visibleSubcategories = useMemo(() => {
-    if (!facets || categories.length === 0) return [];
+    if (!categories.length) return [];
 
-    const facetSubIds = new Set(
-        facets.subcategories.map(Number)
-    );
+    if (!facets || facets.subcategories.length === 0) {
+      return categories.filter((c) => c.level === 2);
+    }
 
+    const facetSubIds = new Set(facets.subcategories.map(Number));
     return categories.filter(
-        (c) =>
+      (c) =>
         c.level === 2 &&
-        facetSubIds.has(Number(c.id))
+        (facetSubIds.has(c.id) || subcategoryIds.includes(c.id))
     );
-    }, [categories, facets]);
+  }, [categories, facets, subcategoryIds]);
 
   const visibleCategories = useMemo(() => {
-    if (visibleSubcategories.length === 0) return [];
+    if (!categories.length) return [];
 
-    const parentIds = new Set(
-        visibleSubcategories
-        .map((s) => Number(s.parent_id))
-        .filter((id) => !Number.isNaN(id))
-    );
+    if (!facets || facets.categories.length === 0) {
+      return categories.filter((c) => c.level === 1);
+    }
 
+    const facetCatIds = new Set(facets.categories.map(Number));
     return categories.filter(
-        (c) =>
+      (c) =>
         c.level === 1 &&
-        parentIds.has(Number(c.id))
+        (facetCatIds.has(c.id) || categoryIds.includes(c.id))
     );
-    }, [categories, visibleSubcategories]);
+  }, [categories, facets, categoryIds]);
 
   return (
-    <aside className="rounded-xl p-4 space-y-4 sticky top-28 bg-[#f6eeff]"> {/* Edit for border/background */}
+    <aside className="rounded-xl bg-[#f6eeff] p-3 sm:p-4 sm:sticky sm:top-28">
+      {/* HEADER */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="font-semibold w-full text-left"
+        className="w-full flex items-center justify-between font-semibold"
       >
-        Filtros
+        <span>Filtros</span>
+        <span className="sm:hidden text-lg">{open ? "▴" : "▾"}</span>
       </button>
 
-      {open && (
-        <>
-          {/* STOCK */}
-          <label className="flex gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={inStockOnly}
-              onChange={(e) => setInStockOnly(e.target.checked)}
-            />
-            Solo en stock
-          </label>
+      {/* CLEAR (mobile quick access) */}
+      <button
+        onClick={() => {
+          onClear();
+          setOpen(false);
+        }}
+        className="mt-2 text-xs text-purple-700 underline sm:hidden"
+      >
+        Limpiar filtros
+      </button>
 
-          {/* CATEGORIES */}
-          {visibleCategories.length > 0 && (
-            <div>
-              <p className="font-semibold mb-2">Categorías</p>
-              <div className="space-y-1">
-                {visibleCategories.map((c) => (
-                  <label key={c.id} className="flex gap-2 text-sm break-words">
-                    <input
-                      type="checkbox"
-                      checked={categoryIds.includes(c.id)}
-                      onChange={() =>
-                        setCategoryIds(
-                          categoryIds.includes(c.id)
-                            ? categoryIds.filter((x) => x !== c.id)
-                            : [...categoryIds, c.id]
-                        )
-                      }
-                    />
-                    {c.name}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
+      {/* CONTENT */}
+      <div className={`${open ? "block" : "hidden"} sm:block mt-3 space-y-4`}>
+        {/* STOCK */}
+        <label className="flex gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={inStockOnly}
+            onChange={(e) => setInStockOnly(e.target.checked)}
+          />
+          Solo en stock
+        </label>
 
-          {/* SUBCATEGORIES */}
-          {visibleSubcategories.length > 0 && (
-            <div>
-              <p className="font-semibold mb-2">Subcategorías</p>
-              <div className="space-y-1">
-                {visibleSubcategories.map((c) => (
-                  <label key={c.id} className="flex gap-2 text-sm break-words">
-                    <input
-                      type="checkbox"
-                      checked={subcategoryIds.includes(c.id)}
-                      onChange={() =>
-                        setSubcategoryIds(
-                          subcategoryIds.includes(c.id)
-                            ? subcategoryIds.filter((x) => x !== c.id)
-                            : [...subcategoryIds, c.id]
-                        )
-                      }
-                    />
-                    {c.name}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* PRICE */}
-          {priceBounds &&
-            priceBounds.min !== null &&
-            priceBounds.max !== null &&
-            priceBounds.min < priceBounds.max && (() => {
-            const min = priceBounds.min;
-            const max = priceBounds.max;
-
-            return (
-                <div className="space-y-2">
-                <p className="font-semibold">Precio</p>
-
-                <div className="relative h-6">
-                    <input
-                    type="range"
-                    min={min}
-                    max={max}
-                    value={priceRange?.[0] ?? min}
-                    onChange={(e) => {
-                        const v = Number(e.target.value);
-                        setPriceRange([
-                        Math.min(v, priceRange?.[1] ?? max),
-                        priceRange?.[1] ?? max,
-                        ]);
-                    }}
-                    className="absolute w-full pointer-events-auto"
-                    />
-
-                    <input
-                    type="range"
-                    min={min}
-                    max={max}
-                    value={priceRange?.[1] ?? max}
-                    onChange={(e) => {
-                        const v = Number(e.target.value);
-                        setPriceRange([
-                        priceRange?.[0] ?? min,
-                        Math.max(v, priceRange?.[0] ?? min),
-                        ]);
-                    }}
-                    className="absolute w-full pointer-events-auto"
-                    />
-                </div>
-
-                <div className="flex justify-between text-xs">
-                    <span>${priceRange?.[0] ?? min}</span>
-                    <span>${priceRange?.[1] ?? max}</span>
-                </div>
-                </div>
-            );
-            })()}
-
-          <div className="text-xs text-gray-400 mt-2">
-            Marca (próximamente)
+        {/* CATEGORIES */}
+        {visibleCategories.length > 0 && (
+          <div>
+            <p className="font-semibold mb-2">Categorías</p>
+            {visibleCategories.map((c) => (
+              <label key={c.id} className="flex gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={categoryIds.includes(c.id)}
+                  onChange={() =>
+                    setCategoryIds(
+                      categoryIds.includes(c.id)
+                        ? categoryIds.filter((x) => x !== c.id)
+                        : [...categoryIds, c.id]
+                    )
+                  }
+                />
+                {c.name}
+              </label>
+            ))}
           </div>
-        </>
-      )}
+        )}
+
+        {/* SUBCATEGORIES */}
+        {visibleSubcategories.length > 0 && (
+          <div>
+            <p className="font-semibold mb-2">Subcategorías</p>
+            {visibleSubcategories.map((c) => (
+              <label key={c.id} className="flex gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={subcategoryIds.includes(c.id)}
+                  onChange={() =>
+                    setSubcategoryIds(
+                      subcategoryIds.includes(c.id)
+                        ? subcategoryIds.filter((x) => x !== c.id)
+                        : [...subcategoryIds, c.id]
+                    )
+                  }
+                />
+                {c.name}
+              </label>
+            ))}
+          </div>
+        )}
+
+        {/* PRICE */}
+        {priceBounds?.min != null && priceBounds?.max != null && (
+          <div>
+            <p className="font-semibold mb-2">Precio</p>
+            <div className="relative h-6">
+              <input
+                type="range"
+                min={minPrice}
+                max={maxPrice}
+                value={priceRange?.[0] ?? minPrice}
+                onChange={(e) =>
+                  setPriceRange([
+                    Number(e.target.value),
+                    priceRange?.[1] ?? maxPrice,
+                  ])
+                }
+                className="absolute w-full"
+              />
+              <input
+                type="range"
+                min={minPrice}
+                max={maxPrice}
+                value={priceRange?.[1] ?? maxPrice}
+                onChange={(e) =>
+                  setPriceRange([
+                    priceRange?.[0] ?? minPrice,
+                    Number(e.target.value),
+                  ])
+                }
+                className="absolute w-full"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* APPLY */}
+        <button
+          onClick={() => {
+            onApply();       // ✅ THIS is what you were missing
+            setOpen(false);  // auto-close on mobile
+          }}
+          className="w-full rounded-xl bg-[var(--navbar-accent)] py-2 text-white font-semibold"
+        >
+          Filtrar
+        </button>
+      </div>
     </aside>
   );
 }

@@ -85,7 +85,7 @@ export function FeaturedGrid({
   decreaseQty,
   canIncrease,
 }: Props) {
-  /* ---------- HERO TILE (LARGE) ---------- */
+  /* ---------- HERO TILE (BIG) ---------- */
   const renderHero = (slot: FeaturedSlot) => {
     const item = getItem(featured, slot, 1);
 
@@ -101,7 +101,7 @@ export function FeaturedGrid({
             decreaseQty={decreaseQty}
             canIncrease={canIncrease}
             variant="featured"
-            heroSize="large"
+            heroSize="large"        // ✅ ALWAYS LARGE
             showRemove={isAdmin}
             onRemove={() => onRemoveClick(slot, 1)}
           />
@@ -134,7 +134,7 @@ export function FeaturedGrid({
                     decreaseQty={decreaseQty}
                     canIncrease={canIncrease}
                     variant="featured"
-                    heroSize="small"
+                    heroSize="small"   // ✅ ALWAYS SMALL
                     showRemove={isAdmin}
                     onRemove={() => onRemoveClick(slot, pos)}
                   />
@@ -167,7 +167,8 @@ export function FeaturedGrid({
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* 📱 mobile: 2 cols | 💻 desktop: 3 cols */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {renderHero("hero_left")}
         {renderGroup("group_1")}
         {renderGroup("group_2")}

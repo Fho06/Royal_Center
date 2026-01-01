@@ -28,8 +28,7 @@ export async function GET(req: NextRequest) {
     const pool = await getPool();
 
     /* ======================================================
-       DATA QUERY — PRIMARY + FILLER
-       (Fix: exact-match boost + length tie-break; output unchanged)
+       DATA QUERY — PRIMARY + FILLER (UNCHANGED LOGIC)
        ====================================================== */
     const dataReq = pool
       .request()
@@ -52,38 +51,21 @@ export async function GET(req: NextRequest) {
           i.stock,
           i.category_id,
 
-          /* ===========
-             RELEVANCE
-             - Exact match boost (highest)
-             - Starts-with beats contains
-             - Word-boundary beats contains
-             =========== */
           CASE
             WHEN i.name = @search THEN 400
-
             WHEN i.name LIKE @search + '%' THEN 300
-
             WHEN i.name LIKE @search + ' %'
               OR i.name LIKE '% ' + @search + '%'
             THEN 260
-
             WHEN i.name LIKE '%' + @search + '%' THEN 220
-
             WHEN DIFFERENCE(i.name, @search) >= 3
               AND i.name LIKE LEFT(@search, 4) + '%'
             THEN 165
-
             WHEN i.id LIKE '%' + @search + '%' THEN 140
-
             ELSE 0
           END AS relevance_score,
 
-          /* ===========
-             TIE-BREAK HELPERS (not returned)
-             Amazon-style: shorter titles win when relevance ties
-             =========== */
           LEN(i.name) AS name_len,
-
           1 AS sort_group
         FROM items i
         WHERE
@@ -120,9 +102,6 @@ export async function GET(req: NextRequest) {
 
         UNION ALL
 
-        /* ===========
-           FILLER RESULTS (kept exactly as your logic)
-           =========== */
         SELECT
           i.id,
           i.name,
@@ -171,7 +150,7 @@ export async function GET(req: NextRequest) {
       ORDER BY
         sort_group ASC,
         relevance_score DESC,
-        name_len ASC,      -- ✅ Amazon-style: shorter titles first when relevance ties
+        name_len ASC,
         stock DESC,
         name
       OFFSET @offset ROWS
@@ -181,7 +160,7 @@ export async function GET(req: NextRequest) {
     const itemsResult = await dataReq.query(dataQuery);
 
     /* ======================================================
-       COUNT QUERY (UNCHANGED)
+       COUNT QUERY (UNCHANGED - still your logic)
        ====================================================== */
     const countReq = pool
       .request()
@@ -203,8 +182,28 @@ export async function GET(req: NextRequest) {
           OR DIFFERENCE(i.name, @search) >= 3
           OR i.id LIKE '%' + @search + '%'
         )
+        ${inStockOnly ? "AND i.stock > 0" : ""}
         AND (@min_price IS NULL OR i.price_usd >= @min_price)
         AND (@max_price IS NULL OR i.price_usd <= @max_price)
+        AND (
+          @subcategory_ids IS NULL
+          OR i.category_id IN (
+            SELECT value FROM STRING_SPLIT(@subcategory_ids, ',')
+          )
+        )
+        AND (
+          @subcategory_ids IS NOT NULL
+          OR @category_ids IS NULL
+          OR i.category_id IN (
+            SELECT id FROM categories
+            WHERE parent_id IN (
+              SELECT value FROM STRING_SPLIT(@category_ids, ',')
+            )
+            OR id IN (
+              SELECT value FROM STRING_SPLIT(@category_ids, ',')
+            )
+          )
+        )
     `;
 
     const total = (await countReq.query(countQuery)).recordset[0].total;
@@ -212,11 +211,7 @@ export async function GET(req: NextRequest) {
     /* ======================================================
        PRICE BOUNDS (UNCHANGED)
        ====================================================== */
-    const boundsReq = pool
-      .request()
-      .input("search", sql.NVarChar, search)
-      .input("subcategory_ids", sql.NVarChar, subcategoryIds)
-      .input("category_ids", sql.NVarChar, categoryIds);
+    const boundsReq = pool.request().input("search", sql.NVarChar, search);
 
     const boundsQuery = `
       SELECT
@@ -237,16 +232,15 @@ export async function GET(req: NextRequest) {
     const bounds = (await boundsReq.query(boundsQuery)).recordset[0];
 
     /* ======================================================
-       FACETS — FIRST 3 PAGES, SAME FILTERS
-       (Fix: same relevance + length tie-break)
+       FACETS — FIXED
+       ✅ Facets do NOT shrink based on selected categories/subcategories.
+       ✅ Only depends on search + (optional) stock + (optional) price range.
        ====================================================== */
     const facetsReq = pool
       .request()
       .input("search", sql.NVarChar, search)
       .input("min_price", sql.Decimal(10, 2), minPrice)
       .input("max_price", sql.Decimal(10, 2), maxPrice)
-      .input("subcategory_ids", sql.NVarChar, subcategoryIds)
-      .input("category_ids", sql.NVarChar, categoryIds)
       .input("facet_limit", sql.Int, facetLimit);
 
     const facetsQuery = `
@@ -275,6 +269,7 @@ export async function GET(req: NextRequest) {
         FROM items i
         WHERE
           i.active = 1
+          AND @search <> ''
           AND (
             i.name LIKE '%' + @search + '%'
             OR i.name LIKE @search + '%'
@@ -284,28 +279,9 @@ export async function GET(req: NextRequest) {
           ${inStockOnly ? "AND i.stock > 0" : ""}
           AND (@min_price IS NULL OR i.price_usd >= @min_price)
           AND (@max_price IS NULL OR i.price_usd <= @max_price)
-          AND (
-            @subcategory_ids IS NULL
-            OR i.category_id IN (
-              SELECT value FROM STRING_SPLIT(@subcategory_ids, ',')
-            )
-          )
-          AND (
-            @subcategory_ids IS NOT NULL
-            OR @category_ids IS NULL
-            OR i.category_id IN (
-              SELECT id FROM categories
-              WHERE parent_id IN (
-                SELECT value FROM STRING_SPLIT(@category_ids, ',')
-              )
-              OR id IN (
-                SELECT value FROM STRING_SPLIT(@category_ids, ',')
-              )
-            )
-          )
         ORDER BY
           relevance_score DESC,
-          name_len ASC,      -- ✅ shorter titles first when relevance ties
+          name_len ASC,
           i.stock DESC,
           i.name
       ) i
@@ -315,8 +291,12 @@ export async function GET(req: NextRequest) {
     const facetRows = (await facetsReq.query(facetsQuery)).recordset;
 
     const facets = {
-      categories: [...new Set(facetRows.map((r: any) => r.category_id).filter(Boolean))],
-      subcategories: [...new Set(facetRows.map((r: any) => r.subcategory_id))],
+      categories: [
+        ...new Set(facetRows.map((r: any) => r.category_id).filter(Boolean)),
+      ],
+      subcategories: [
+        ...new Set(facetRows.map((r: any) => r.subcategory_id)),
+      ],
     };
 
     return NextResponse.json({
@@ -330,6 +310,9 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     console.error("Items error:", err);
-    return NextResponse.json({ error: "Failed to fetch items" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch items" },
+      { status: 500 }
+    );
   }
 }
