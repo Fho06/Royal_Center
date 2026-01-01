@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import { useParams, useRouter } from "next/navigation";
+import { useCart } from "@/app/context/CartContext";
 
 type Order = {
   id: number;
@@ -53,6 +54,8 @@ export default function PagoMovilPage() {
   const [reference, setReference] = useState("");
   const [phoneLast4, setPhoneLast4] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const { setCart } = useCart();
+
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -103,10 +106,11 @@ export default function PagoMovilPage() {
           order_id: order.id,
           sender_bank: senderBank,
           reference_number: reference,
-          amount: order.total_amount, // exact amount enforced
+          amount: order.total_amount,
           phone_last4: phoneLast4 || undefined,
         }),
       });
+      setCart([]);
 
       router.push(`/orders/${order.id}`);
     } catch (e: any) {
@@ -122,105 +126,114 @@ export default function PagoMovilPage() {
   const account = accounts[0];
 
   return (
-    <main className="max-w-6xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Pago Móvil</h1>
+    <main className="mx-auto p-6">
+      <div className="max-w-3xl mx-auto space-y-6">
+        <h1 className="text-2xl font-semibold">Pago Móvil</h1>
 
-      {/* WARNING */}
-      <div className="flex items-center gap-3 rounded bg-yellow-50 border border-yellow-300 p-3 text-sm">
-        ⚠️ Debes realizar el pago por el <strong>monto exacto</strong> o la orden
-        no será procesada.
-      </div>
+        {error && (
+          <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
-      {error && (
-        <div className="rounded border border-red-400 bg-red-50 p-3 text-red-700">
-          {error}
-        </div>
-      )}
+        {/* CONTENT */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* STEP 1 */}
+          <section className="bg-white rounded-xl elevation-xl overflow-hidden md:col-span-2">
+            <div className="bg-[var(--reg-accent-soft)] px-4 py-3 font-semibold flex gap-3 items-center">
+              <span className="w-6 h-6 rounded-full bg-[var(--reg-accent)] text-white flex items-center justify-center text-sm font-bold">
+                1
+              </span>
+              Completa los datos de la cuenta con la que pagaste
+            </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* STEP 1 */}
-        <section className="border rounded">
-          <div className="bg-gray-50 border-b px-4 py-2 font-medium flex gap-2">
-            <span className="w-6 h-6 rounded-full bg-black text-white flex items-center justify-center text-sm">
-              1
-            </span>
-            Completa los datos de la cuenta con la que pagaste
+            <div className="p-3 space-y-3 text-sm">
+              <select
+                value={senderBank}
+                onChange={(e) => setSenderBank(e.target.value)}
+                className="w-full border rounded px-3 py-2"
+              >
+                <option value="">Selecciona tu banco</option>
+                {BANKS.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                placeholder="Referencia / N° de operación"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                className="w-full border rounded px-3 py-1.5 text-sm"
+              />
+
+              <input
+                placeholder="Últimos 4 dígitos del teléfono"
+                value={phoneLast4}
+                onChange={(e) => setPhoneLast4(e.target.value)}
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+          </section>
+
+          {/* WARNING — FULL WIDTH */}
+          <div className="md:col-span-2">
+            <div className="rounded-lg bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5">⚠️</span>
+                <p className="leading-snug">
+                  Debes realizar el pago por el <strong>monto exacto</strong> o la
+                  orden no será procesada.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="p-4 space-y-4">
-            <select
-              value={senderBank}
-              onChange={(e) => setSenderBank(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-            >
-              <option value="">Selecciona tu banco</option>
-              {BANKS.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
+          {/* STEP 2 */}
+          <section className="bg-white rounded-xl elevation-xl overflow-hidden md:col-span-2">
+            <div className="bg-[var(--reg-accent-soft)] px-4 py-3 font-semibold flex gap-3 items-center">
+              <span className="w-6 h-6 rounded-full bg-[var(--reg-accent)] text-white flex items-center justify-center text-sm font-bold">
+                2
+              </span>
+              Datos para realizar el pago móvil
+            </div>
 
-            <input
-              placeholder="Referencia / N° de operación"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-            />
+            <div className="p-4 space-y-2.5 text-sm">
+              <p>
+                <strong>Monto:</strong> Bs. {order.total_amount.toFixed(2)}
+              </p>
 
-            <input
-              placeholder="Últimos 4 dígitos del teléfono (opcional)"
-              value={phoneLast4}
-              onChange={(e) => setPhoneLast4(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
-        </section>
-
-        {/* STEP 2 */}
-        <section className="border rounded">
-          <div className="bg-gray-50 border-b px-4 py-2 font-medium flex gap-2">
-            <span className="w-6 h-6 rounded-full bg-black text-white flex items-center justify-center text-sm">
-              2
-            </span>
-            Datos para realizar el pago móvil
-          </div>
-
-          <div className="p-4 space-y-2 text-sm">
-            <p>
-              <strong>Monto:</strong>{" "}
-              Bs. {order.total_amount.toFixed(2)}
-            </p>
-
-            {account && (
-              <>
-                <p>
-                  <strong>Banco:</strong> {account.bank_name}
-                </p>
-                <p>
-                  <strong>Teléfono:</strong> {account.phone}
-                </p>
-                <p>
-                  <strong>RIF:</strong> {account.rif}
-                </p>
-                {account.beneficiary_name && (
+              {account && (
+                <>
                   <p>
-                    <strong>Beneficiario:</strong>{" "}
-                    {account.beneficiary_name}
+                    <strong>Banco:</strong> {account.bank_name}
                   </p>
-                )}
-              </>
-            )}
+                  <p>
+                    <strong>Teléfono:</strong> {account.phone}
+                  </p>
+                  <p>
+                    <strong>RIF:</strong> {account.rif}
+                  </p>
+                  {account.beneficiary_name && (
+                    <p>
+                      <strong>Beneficiario:</strong>{" "}
+                      {account.beneficiary_name}
+                    </p>
+                  )}
+                </>
+              )}
 
-            <button
-              disabled={submitting}
-              onClick={submitPayment}
-              className="mt-4 w-full bg-black text-white py-2 rounded font-medium disabled:opacity-50"
-            >
-              Ya realicé el pago
-            </button>
-          </div>
-        </section>
+              <button
+                disabled={submitting}
+                onClick={submitPayment}
+                className="mt-3 w-full reg-btn text-white py-1.5 rounded-lg font-bold disabled:opacity-50"
+              >
+                Ya realicé el pago
+              </button>
+            </div>
+          </section>
+        </div>
       </div>
     </main>
   );

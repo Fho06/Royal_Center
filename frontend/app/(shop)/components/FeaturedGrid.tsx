@@ -134,7 +134,7 @@ export function FeaturedGrid({
                     decreaseQty={decreaseQty}
                     canIncrease={canIncrease}
                     variant="featured"
-                    heroSize="small"   // ✅ ALWAYS SMALL
+                    heroSize="small"
                     showRemove={isAdmin}
                     onRemove={() => onRemoveClick(slot, pos)}
                   />
@@ -156,8 +156,8 @@ export function FeaturedGrid({
   return (
     <section className="space-y-3">
       <div className="flex items-end justify-between">
-        <h2 className="text-2xl font-semibold pl-10 pb-5">
-          Productos destacados
+        <h2 className="text-2xl font-semibold pb-5">
+          Productos Destacados
         </h2>
 
         {isAdmin && (

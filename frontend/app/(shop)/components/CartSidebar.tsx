@@ -87,7 +87,7 @@ export function CartSidebar(props: Props) {
 
           <button
             onClick={() => router.push("/checkout")}
-            className="mt-3 w-full rounded-xl bg-[var(--navbar-accent)] !text-white py-3 text-sm font-semibold hover:brightness-95">
+            className="mt-3 w-full rounded-xl bg-[var(--reg-accent)] !text-white py-3 text-sm font-semibold hover:brightness-95">
             Continuar al Carrito
           </button>
         </div>

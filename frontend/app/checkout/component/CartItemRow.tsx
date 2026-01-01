@@ -29,7 +29,8 @@ export function CartItemRow({
     : `${IMAGE_BASE_URL}/${item.item_id}/1.${IMAGE_EXTENSIONS[extIndex]}`;
 
   return (
-    <div className="flex gap-4 border rounded p-4">
+    <div className="flex gap-4 p-4 bg-white rounded-lg">
+      {/* IMAGE */}
       <div className="w-20 h-20 relative shrink-0">
         <Image
           src={src}
@@ -46,26 +47,29 @@ export function CartItemRow({
         />
       </div>
 
+      {/* INFO */}
       <div className="flex-1">
-        <p className="font-medium">{item.name}</p>
+        <p className="font-medium leading-tight">{item.name}</p>
         <p className="text-sm text-gray-500">
           ${item.price.toFixed(2)}
         </p>
 
         <div className="mt-2 flex items-center gap-2">
+          <div className="flex items-center rounded-xl border border-gray-200 bg-white">
           <button
             onClick={() => decreaseQty(item.item_id)}
-            className="w-7 h-7 border rounded"
+            className="h-8 w-8 rounded-l-xl hover:bg-black/5 disabled:opacity-50"
           >
             −
           </button>
-          <span>{item.quantity}</span>
+          <span className="w-4 text-center">{item.quantity}</span>
           <button
             onClick={() => increaseQty(item.item_id)}
-            className="w-7 h-7 border rounded"
+            className="h-8 w-8 rounded-r-xl hover:bg-black/5 disabled:opacity-50"
           >
             +
           </button>
+          </div>
         </div>
       </div>
 
@@ -77,7 +81,7 @@ export function CartItemRow({
 
         <button
           onClick={() => removeFromCart(item.item_id)}
-          className="text-xs text-red-600"
+          className="text-xs text-red-600 hover:underline"
         >
           Eliminar
         </button>

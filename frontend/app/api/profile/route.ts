@@ -74,6 +74,7 @@ export async function PUT(req: Request) {
     .input("user_id", sql.Int, user.userId)
     .input("first_name", sql.VarChar(100), body.firstName || null)
     .input("last_name", sql.VarChar(150), body.lastName || null)
+    .input("email", sql.VarChar(255), body.email || null)
     .input("gender", sql.VarChar(6), body.gender || null)
     .input("dob_day", sql.Int, body.dobDay || null)
     .input("dob_month", sql.VarChar(15), body.dobMonth || null)
@@ -83,6 +84,7 @@ export async function PUT(req: Request) {
       SET
         first_name = @first_name,
         last_name = @last_name,
+        email = @email,
         gender = @gender,
         dob_day = @dob_day,
         dob_month = @dob_month,

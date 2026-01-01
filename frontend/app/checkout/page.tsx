@@ -5,9 +5,9 @@ import { apiRequest } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AddressModal } from "@/app/account/components/AddressModal";
-import { CartItemRow } from "./CartItemRow";
-import { EmptyCart } from "./EmptyCart";
-import { AddressSelector } from "./AddressSelector";
+import { CartItemRow } from "./component/CartItemRow";
+import { EmptyCart } from "./component/EmptyCart";
+import { AddressSelector } from "./component/AddressSelector";
 import { AnimatedDropdown } from "@/app/components/AnimatedDropdown";
 
 const TIP_PRESETS = [0, 0.5, 1, 1.5, 2];
@@ -145,6 +145,7 @@ export default function CheckoutPage() {
           cart.length === 0 ? (
             <EmptyCart />
           ) : (
+            <div className="checkout-card overflow-hidden divide-y divide-gray-100"> {
             cart.map(item => (
               <CartItemRow
                 key={item.item_id}
@@ -153,10 +154,11 @@ export default function CheckoutPage() {
                 decreaseQty={decreaseQty}
                 removeFromCart={removeFromCart}
               />
-            ))
+            ))}
+            </div>
           )
         ) : (
-          <div className="border rounded-lg">
+          <div className="checkout-card">
             <button
               onClick={() => setProductsOpen(v => !v)}
               className="w-full flex justify-between items-center p-4 font-semibold"
@@ -168,14 +170,14 @@ export default function CheckoutPage() {
             </button>
 
             <AnimatedDropdown open={productsOpen}>
-              <div className="border-t p-4 space-y-3">
+              <div className="checkout-card overflow-hidden divide-y divide-gray-100 "> 
                 {cart.map(item => (
                   <CartItemRow
                     key={item.item_id}
                     item={item}
-                    increaseQty={() => {}}
-                    decreaseQty={() => {}}
-                    removeFromCart={() => {}}
+                    increaseQty={increaseQty}
+                    decreaseQty={decreaseQty}
+                    removeFromCart={removeFromCart}
                   />
                 ))}
               </div>
@@ -187,14 +189,14 @@ export default function CheckoutPage() {
         {step === "review" && (
           <>
             <AnimatedDropdown open={fulfillmentType === "pickup"}>
-              <div className="border rounded-lg p-4 space-y-2">
+              <div className="checkout-card p-4 space-y-2">
                 <div className="font-semibold">Lugar de retiro</div>
                 <select
                   value={pickupLocation}
                   onChange={e =>
                     setPickupLocation(e.target.value as PickupLocation)
                   }
-                  className="w-full border rounded px-3 py-2 text-sm"
+                  className="w-full checkout-card px-3 py-2 text-sm"
                 >
                   <option value="royal_center_main">
                     Royal Center – Principal
@@ -203,10 +205,14 @@ export default function CheckoutPage() {
               </div>
             </AnimatedDropdown>
 
+
+
+
+            {/* PROPINA, AGREGAR DESPUES, DEFAULT = 0
             <AnimatedDropdown
               open={step === "review" && fulfillmentType === "delivery"}
             >
-              <div className="border rounded-lg p-4 space-y-2">
+              <div className="checkout-card p-4 space-y-2">
                 <div className="font-semibold">Propina</div>
                 <div className="flex gap-2 flex-wrap">
                   {TIP_PRESETS.map(v => (
@@ -217,7 +223,7 @@ export default function CheckoutPage() {
                         setCustomTip("");
                       }}
                       className={`px-3 py-1 border rounded ${
-                        tip === v ? "bg-blue-600 text-white" : ""
+                        tip === v [#c5a5e9] text-white" : ""
                       }`}
                     >
                       REF {v.toFixed(2)}
@@ -237,19 +243,28 @@ export default function CheckoutPage() {
               </div>
             </AnimatedDropdown>
 
+              */}
+
             <AnimatedDropdown open={step === "review"}>
-              <div className="border rounded-lg p-4">
+              <div className="checkout-card p-4">
                 <div className="font-semibold mb-1">Notas</div>
                 <textarea
                   value={notes}
+                  maxLength={100}
                   placeholder={
                     fulfillmentType === "delivery"
-                      ? "Ejemplo: entregar a la puerta"
+                      ? "Ej: Entregar al vigilante"
                       : "Notas adicionales"
                   }
-                  onChange={e => setNotes(e.target.value)}
-                  className="w-full border rounded p-2"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v.length <= 100) setNotes(v);
+                  }}
+                  className="w-full checkout-card rounded p-2"
                 />
+                <div className="flex justify-end text-xs text-gray-500 mt-1">
+                  {notes.length}/100
+                </div>
               </div>
             </AnimatedDropdown>
           </>
@@ -257,11 +272,11 @@ export default function CheckoutPage() {
       </section>
 
       {/* RIGHT */}
-      <aside className="border rounded-lg p-4 space-y-4 h-fit">
+      <aside className="bg-white rounded-xl elevation-xl p-4 space-y-4 h-fit">
         <h2 className="text-lg font-semibold">Resumen del pedido</h2>
 
         {/* ENTREGA */}
-        <div className="border rounded-lg">
+        <div className="bg-white rounded-lg elevation-md border border-gray-200">
           <button
             onClick={() => setDeliveryOpen(v => !v)}
             className="w-full flex justify-between items-center p-4 font-semibold"
@@ -273,7 +288,7 @@ export default function CheckoutPage() {
           </button>
 
           <AnimatedDropdown open={deliveryOpen}>
-            <div className="border-t p-4 space-y-2 text-sm">
+            <div className="p-4 space-y-2 text-sm">
               <label className="flex gap-2">
                 <input
                   type="radio"
@@ -296,10 +311,10 @@ export default function CheckoutPage() {
 
         {/* DIRECCIÓN */}
         {fulfillmentType === "delivery" && (
-          <div className="border rounded-lg">
+          <div className="bg-white rounded-lg elevation-md border border-gray-200">
             <button
               onClick={() => setAddressOpen(v => !v)}
-              className="w-full flex justify-between items-center p-4 font-semibold"
+              className="w-full flex justify-between items-center p-4 font-semibold bg-[#fafafa] rounded-lg"
             >
               <span>Dirección</span>
               <span className={`transition-transform ${addressOpen ? "rotate-180" : ""}`}>
@@ -308,7 +323,7 @@ export default function CheckoutPage() {
             </button>
 
             <AnimatedDropdown open={addressOpen}>
-              <div className="border-t p-4">
+              <div className="p-4">
                 <AddressSelector
                   addresses={addresses}
                   selectedAddressId={selectedAddressId}
@@ -327,17 +342,20 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        <hr />
+        <hr className="border-gray-200" />
 
         <div className="flex justify-between">
           <span>Subtotal</span>
           <span>${subtotal.toFixed(2)}</span>
         </div>
 
+{/*
         <div className="flex justify-between">
           <span>Propina</span>
           <span>${tip.toFixed(2)}</span>
         </div>
+
+  */}
 
         <div className="flex justify-between font-bold">
           <span>Total</span>
@@ -347,7 +365,8 @@ export default function CheckoutPage() {
         {step === "checkout" ? (
           <button
             onClick={handleGoToReview}
-            className="w-full bg-blue-600 text-white py-2 rounded"
+            className="w-full reg-btn py-2 rounded font-bold disabled:opacity-50"
+
           >
             Ir a pagar
           </button>
@@ -355,7 +374,7 @@ export default function CheckoutPage() {
           <button
             onClick={confirmOrder}
             disabled={submitting}
-            className="w-full bg-blue-600 text-white py-2 rounded disabled:bg-gray-400"
+            className="w-full reg-btn py-2 rounded font-bold disabled:opacity-50"
           >
             Confirmar pedido
           </button>

@@ -45,6 +45,8 @@ export function SearchFilters({
 }: Props) {
   const categories = useCategories();
   const [open, setOpen] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+
 
   // normalize bounds for TS + safety
   const minPrice = priceBounds?.min ?? 0;
@@ -166,8 +168,8 @@ export function SearchFilters({
         {/* PRICE */}
         {priceBounds?.min != null && priceBounds?.max != null && (
           <div>
-            <p className="font-semibold mb-2">Precio</p>
-            <div className="relative h-6">
+            <p className="font-semibold mb-2 ">Precio</p>
+            <div className="relative h-6 ">
               <input
                 type="range"
                 min={minPrice}
@@ -179,7 +181,7 @@ export function SearchFilters({
                     priceRange?.[1] ?? maxPrice,
                   ])
                 }
-                className="absolute w-full"
+                className="absolute w-full price-slider"
               />
               <input
                 type="range"
@@ -192,8 +194,12 @@ export function SearchFilters({
                     Number(e.target.value),
                   ])
                 }
-                className="absolute w-full"
+                className="absolute w-full price-slider"
               />
+            </div>
+            <div className="mt-2 text-sm text-gray-700 flex justify-between">
+              <span>${priceRange?.[0] ?? minPrice}</span>
+              <span>${priceRange?.[1] ?? maxPrice}</span>
             </div>
           </div>
         )}
@@ -201,10 +207,10 @@ export function SearchFilters({
         {/* APPLY */}
         <button
           onClick={() => {
-            onApply();       // ✅ THIS is what you were missing
-            setOpen(false);  // auto-close on mobile
+            onApply();
+            setOpen(false);
           }}
-          className="w-full rounded-xl bg-[var(--navbar-accent)] py-2 text-white font-semibold"
+          className="w-full rounded-xl bg-[var(--reg-accent)] py-2 text-white font-semibold"
         >
           Filtrar
         </button>

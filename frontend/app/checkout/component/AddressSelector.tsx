@@ -32,7 +32,7 @@ export function AddressSelector({
   if (addresses.length === 0) {
     return (
       <div className="text-sm text-gray-500">
-        No tienes direcciones guardadas.
+        No tienes direcciónes guardadas.
         <button
           onClick={onAdd}
           className="block mt-2 text-blue-600 text-sm"
@@ -79,7 +79,7 @@ export function AddressSelector({
 
             <button
               onClick={() => onEdit(selected)}
-              className="text-xs text-blue-600"
+              className="elevation-md bg-[var(--navbar-accent-soft)] text-white px-2 h-8 rounded-md pt-"
             >
               Editar
             </button>

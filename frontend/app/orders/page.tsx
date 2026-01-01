@@ -67,7 +67,7 @@ export default function OrdersPage() {
       <select
         value={status}
         onChange={(e) => setStatus(e.target.value)}
-        className="border rounded px-3 py-2 mb-4"
+        className="checkout-card px-3 py-2 mb-4"
       >
         <option value="all">Todas</option>
         <option value="under_review">En Revisión</option>
@@ -86,7 +86,7 @@ export default function OrdersPage() {
           <div
             key={order.id}
             onClick={() => router.push(`/orders/${order.id}`)}
-            className="border rounded p-4 cursor-pointer hover:bg-gray-50"
+            className="checkout-card p-4 cursor-pointer hover:bg-gray-50"
           >
             <p className="font-semibold">Orden #{order.id}</p>
             <p>Estado: {order.status_label}</p>

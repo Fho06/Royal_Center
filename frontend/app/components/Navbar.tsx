@@ -41,7 +41,7 @@ export default function Navbar() {
 
   const { isAuthenticated, user, logout } = useAuth();
   const isAdmin = user?.role === "admin";
-  const { cart, setCart } = useCart();
+  const { cart, cartCount, setCart } = useCart();
 
   /* mounted guard */
   const [mounted, setMounted] = useState(false);
@@ -54,6 +54,11 @@ export default function Navbar() {
   const [activeIndex, setActiveIndex] = useState(-1);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const isTouch =
+    typeof window !== "undefined" &&
+    ("ontouchstart" in window || navigator.maxTouchPoints > 0);
+
 
   useEffect(() => {
     setSearch(searchParams.get("search") || "");
@@ -178,6 +183,20 @@ export default function Navbar() {
     profileTimer.current = setTimeout(() => setProfileOpen(false), 150);
   }
 
+  /* close dropdowns on scroll (mobile) */
+  useEffect(() => {
+    function handleScroll() {
+      setCartOpen(false);
+      setProfileOpen(false);
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
   if (!mounted) return null;
 
   return (
@@ -191,7 +210,7 @@ export default function Navbar() {
             {/* BRAND */}
             <Link
               href="/"
-              className="navbar-brand sm: text-2xl lg:text-4xl font-serif whitespace-nowrap order-1"
+              className="navbar-brand !text-black sm: text-2xl lg:text-4xl font-serif whitespace-nowrap order-1"
             >
               Royal Center
             </Link>
@@ -287,22 +306,34 @@ export default function Navbar() {
               {/* CART */}
               <div
                 className="relative"
-                onMouseEnter={openCart}
-                onMouseLeave={closeCart}
+                onMouseEnter={!isTouch ? openCart : undefined}
+                onMouseLeave={!isTouch ? closeCart : undefined}
               >
                 <button
-                  onClick={() => router.push("/checkout")}
-                  className="relative flex items-center"
+                  onClick={() => {
+                    if (isTouch) {
+                      router.push("/checkout");
+                    }
+                  }}
+                  className="relative flex items-center pr-1"
                 >
-                  <Image src="/cart6.png" alt="Cart" width={30} height={30} className="align-middle" />
+                  <Image
+                    src="/cart6.png"
+                    alt="Cart"
+                    width={30}
+                    height={30}
+                    className="align-middle"
+                  />
+
                   {cart.length > 0 && (
-                    <span className="navbar-badge absolute -top-2 -right-2 text-xs rounded-full px-1">
-                      {cart.length}
+                    <span className="navbar-badge absolute -top-2 -right-1 text-xs rounded-full px-1">
+                      {cartCount}
                     </span>
                   )}
                 </button>
 
-                {cartOpen && (
+                {/* DESKTOP ONLY CART PREVIEW */}
+                {!isTouch && cartOpen && (
                   <div className="absolute right-0 top-full mt-2 w-80">
                     <CartSidebar
                       cart={cart}
@@ -330,7 +361,6 @@ export default function Navbar() {
                 )}
               </div>
             </div>
-
           </div>
         </div>
       </div>

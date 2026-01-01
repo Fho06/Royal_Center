@@ -17,22 +17,22 @@ export function AddressesSection({
   return (
     <section className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Direcciones</h2>
+        <h2 className="text-lg font-semibold">Direcciónes</h2>
         <button
           onClick={() => {
             setEditing(null);
             setModalOpen(true);
           }}
-          className="bg-black text-white px-3 py-2 rounded"
+          className="elevation-md bg-[var(--reg-accent)] text-white px-3 py-2 rounded-md"
         >
           + Agregar dirección
         </button>
       </div>
 
       {addresses.map((a, i) => (
-        <div key={a.address_id} className="border p-4 rounded relative">
+        <div key={a.address_id} className="bg-white p-4 rounded-2xl elevation-md relative">
           {a.is_default && (
-            <span className="absolute top-2 right-2 text-xs bg-black text-white px-2 py-1 rounded">
+            <span className="absolute top-2 right-2 text-xs bg-[var(--navbar-accent)] text-white px-2 py-1 rounded-md elevation-md">
               Predeterminada
             </span>
           )}
@@ -53,7 +53,7 @@ export function AddressesSection({
               setEditing(a);
               setModalOpen(true);
             }}
-            className="text-blue-600 text-sm mt-2"
+            className="elevation-md bg-[var(--reg-accent)] text-white px-3 py-1 rounded-md absolute bottom-2 right-2"
           >
             Editar
           </button>

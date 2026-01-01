@@ -35,6 +35,8 @@ type CartContextType = {
   canIncrease: (itemId: string) => boolean;
 
   clearCart: () => void;
+
+  cartCount: number; // ✅ TOTAL QUANTITY
 };
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -95,7 +97,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [cart, hydrated]);
 
   /* =========================
-     CART HELPERS (🔥 MOVED HERE)
+     DERIVED VALUES
+     ========================= */
+
+  const cartCount = cart.reduce(
+    (sum, item) => sum + item.quantity,
+    0
+  );
+
+  /* =========================
+     CART HELPERS
      ========================= */
 
   function cartQty(itemId: string) {
@@ -108,10 +119,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return cartItem.stock - cartItem.quantity;
   }
 
-
   function canIncrease(itemId: string) {
     const cartItem = cart.find(c => c.item_id === itemId);
-    if (!cartItem) return true; // not in cart yet → can add
+    if (!cartItem) return true;
     return cartItem.quantity < cartItem.stock;
   }
 
@@ -187,6 +197,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         decreaseQty,
         canIncrease,
         clearCart,
+        cartCount, // ✅ EXPOSED HERE
       }}
     >
       {children}
