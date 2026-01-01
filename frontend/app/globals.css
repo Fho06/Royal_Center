@@ -1,9 +1,78 @@
 @import "tailwindcss";
 
+/* =========================
+   ROOT THEME VARIABLES
+   ========================= */
+
 :root {
-  --background: #ffffff;
+  --background: #faf5ff;
   --foreground: #171717;
+
+  /* Navbar */
+  --navbar-accent: #aa70ec;
+  --navbar-accent-soft: #bc8bff;
 }
+
+/* =========================
+   BASE STYLES
+   ========================= */
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+}
+
+button,
+[role="button"],
+a,
+input[type="button"],
+input[type="submit"],
+input[type="checkbox"],
+input[type="radio"],
+label {
+  cursor: pointer;
+}
+
+/* =========================
+   LAYOUT / CONTAINMENT
+   ========================= */
+
+.app-shell {
+  width: 100%;
+  padding-inline: 16px; /* mobile */
+}
+.navbar .app-shell {
+  padding-inline: 0;
+}
+
+/* Large phones / tablets */
+@media (min-width: 640px) {
+  .app-shell {
+    padding-inline: 0;
+  }
+}
+
+/* Desktop containment */
+@media (min-width: 1024px) {
+  .app-shell {
+    max-width: 1280px;
+    margin-inline: auto;
+    padding-inline: 0;
+  }
+}
+
+/* Ultra-wide stability */
+@media (min-width: 1536px) {
+  .app-shell {
+    max-width: 1440px;
+  }
+}
+
+/* =========================
+   COMPONENT UTILITIES
+   ========================= */
 
 .featured-tile-frame {
   border-radius: 1rem;
@@ -11,12 +80,24 @@
   overflow: hidden;
 }
 
+.lavender-bg {
+  background-color: #c5a5e9;
+}
+
+/* =========================
+   TAILWIND THEME BRIDGE
+   ========================= */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
+
+/* =========================
+   ANIMATIONS
+   ========================= */
 
 @keyframes cart-in {
   from {
@@ -46,56 +127,155 @@
   animation: slide-up 0.25s ease-out;
 }
 
+/* =========================
+   NAVBAR — BASE THEME
+   ========================= */
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.navbar,
+.navbar a,
+.navbar button,
+.navbar input {
+  color: var(--navbar-accent);
 }
 
-button,
-[role="button"],
-a,
-input[type="button"],
-input[type="submit"],
-input[type="checkbox"],
-input[type="radio"],
-label {
-  cursor: pointer;
+/* borders */
+.navbar-border,
+.navbar-input,
+.navbar-dropdown {
+  border-color: var(--navbar-accent);
 }
 
-/* ===============================
-   RESPONSIVENESS CONTAINMENT
-   =============================== */
-
-.app-shell {
-  width: 100%;
-  padding-left: 16px;   /* mobile */
-  padding-right: 16px;
+/* buttons */
+.navbar-btn {
+  background-color: var(--navbar-accent);
+  color: white;
 }
 
-/* Large phones / tablets */
-@media (min-width: 640px) {
-  .app-shell {
-    padding-left: 24px;
-    padding-right: 24px;
-  }
+.navbar-btn:hover {
+  filter: brightness(0.95);
 }
 
-/* Desktop containment */
-@media (min-width: 1024px) {
-  .app-shell {
-    max-width: 1280px;
-    margin-left: auto;
-    margin-right: auto;
-    padding-left: 0;    /* prevent double padding */
-    padding-right: 0;
-  }
+/* badge */
+.navbar-badge {
+  background-color: var(--navbar-accent);
+  color: white;
 }
 
-/* Ultra-wide stability */
-@media (min-width: 1536px) {
-  .app-shell {
-    max-width: 1440px;
-  }
+/* typed text */
+.navbar-input {
+  color: black !important;
 }
+
+/* placeholder */
+.navbar-input::placeholder {
+  color: #9ca3af !important; /* light grey */
+}
+
+/* search history dropdown text */
+.navbar-history,
+.navbar-history span,
+.navbar-history button {
+  color: #313336 !important;
+}
+
+
+/* =========================
+   NAVBAR — TYPOGRAPHY
+   ========================= */
+
+.navbar {
+  font-weight: 500;
+}
+
+.navbar a,
+.navbar button {
+  font-weight: 600;
+}
+
+.navbar-dropdown a,
+.navbar-dropdown button,
+.navbar-input {
+  font-weight: 500;
+}
+
+.navbar-brand {
+  font-weight: 700;
+}
+
+/* =========================
+   CART SIDEBAR
+   ========================= */
+
+.cart-sidebar {
+  background: white;
+  border: none !important;
+  border-radius: 14px;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+  color: black;
+}
+
+/* force all text black */
+.cart-sidebar,
+.cart-sidebar * {
+  color: black !important;
+}
+
+/* dividers */
+.cart-sidebar hr {
+  border-color: #e5e7eb;
+}
+
+/* =========================
+   CART CHECKOUT BUTTON
+   ========================= */
+
+.cart-sidebar .checkout-btn {
+  background-color: var(--navbar-accent); /* your purple */
+  color: white !important;
+  border: none !important;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.cart-sidebar .checkout-btn:hover {
+  filter: brightness(0.95);
+}
+
+.cart-sidebar .qty-btn {
+  background: white;
+  border: 1px solid #e5e7eb;
+  color: black !important;
+  border-radius: 8px;
+}
+
+.cart-sidebar .qty-btn:hover {
+  background: #f3f4f6;
+}
+
+/* =========================
+   ELEVATION / SHADOWS
+   ========================= */
+
+/* Strong floating card*/
+.elevation-strong {
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.18),
+    0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* Extra strong (modals, focus states) */
+.elevation-xl {
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.22),
+    0 10px 24px rgba(0, 0, 0, 0.16);
+}
+
+/* Medium (cards, dropdowns) */
+.elevation-md {
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+}
+

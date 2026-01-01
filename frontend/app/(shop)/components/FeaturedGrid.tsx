@@ -85,7 +85,7 @@ export function FeaturedGrid({
   decreaseQty,
   canIncrease,
 }: Props) {
-  /* ---------- HERO TILE ---------- */
+  /* ---------- HERO TILE (LARGE) ---------- */
   const renderHero = (slot: FeaturedSlot) => {
     const item = getItem(featured, slot, 1);
 
@@ -101,6 +101,7 @@ export function FeaturedGrid({
             decreaseQty={decreaseQty}
             canIncrease={canIncrease}
             variant="featured"
+            heroSize="large"
             showRemove={isAdmin}
             onRemove={() => onRemoveClick(slot, 1)}
           />
@@ -111,7 +112,7 @@ export function FeaturedGrid({
     );
   };
 
-  /* ---------- GROUP TILE (2x2) ---------- */
+  /* ---------- GROUP TILE (SMALL) ---------- */
   const renderGroup = (slot: FeaturedSlot) => {
     const positions: (1 | 2 | 3 | 4)[] = [1, 2, 3, 4];
 
@@ -133,6 +134,7 @@ export function FeaturedGrid({
                     decreaseQty={decreaseQty}
                     canIncrease={canIncrease}
                     variant="featured"
+                    heroSize="small"
                     showRemove={isAdmin}
                     onRemove={() => onRemoveClick(slot, pos)}
                   />
@@ -154,7 +156,7 @@ export function FeaturedGrid({
   return (
     <section className="space-y-3">
       <div className="flex items-end justify-between">
-        <h2 className="text-xl font-semibold">
+        <h2 className="text-2xl font-semibold pl-10 pb-5">
           Productos destacados
         </h2>
 
