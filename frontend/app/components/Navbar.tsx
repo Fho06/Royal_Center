@@ -43,17 +43,11 @@ export default function Navbar() {
   const isAdmin = user?.role === "admin";
   const { cart, setCart } = useCart();
 
-  /* =========================
-     MOUNTED GUARD
-     ========================= */
+  /* mounted guard */
   const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => setMounted(true), []);
 
-  /* =========================
-     SEARCH STATE
-     ========================= */
+  /* search state */
   const [search, setSearch] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -65,9 +59,7 @@ export default function Navbar() {
     setSearch(searchParams.get("search") || "");
   }, [searchParams]);
 
-  /* =========================
-     LOAD SEARCH HISTORY
-     ========================= */
+  /* load history */
   useEffect(() => {
     async function load() {
       const token = getToken();
@@ -80,23 +72,16 @@ export default function Navbar() {
         headers: { authorization: `Bearer ${token}` },
       });
 
-      if (res.ok) {
-        setHistory(await res.json());
-      }
+      if (res.ok) setHistory(await res.json());
     }
 
     if (mounted) load();
-  }, [isAuthenticated, mounted]);
+  }, [mounted, isAuthenticated]);
 
-  /* =========================
-     SUBMIT SEARCH
-     ========================= */
+  /* submit search */
   async function submitSearch(value: string) {
     const q = value.trim();
-    if (!q) {
-      router.push("/");
-      return;
-    }
+    if (!q) return router.push("/");
 
     const token = getToken();
 
@@ -165,9 +150,7 @@ export default function Navbar() {
     setHistory(next);
   }
 
-  /* =========================
-     CART PREVIEW
-     ========================= */
+  /* cart preview */
   const [cartOpen, setCartOpen] = useState(false);
   const cartTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -177,16 +160,12 @@ export default function Navbar() {
   }
 
   function closeCart() {
-    cartTimer.current = setTimeout(() => {
-      setCartOpen(false);
-    }, 150);
+    cartTimer.current = setTimeout(() => setCartOpen(false), 150);
   }
 
-  const total = cart.reduce((sum, it) => sum + it.price * it.quantity, 0);
+  const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
-  /* =========================
-     PROFILE DROPDOWN
-     ========================= */
+  /* profile dropdown */
   const [profileOpen, setProfileOpen] = useState(false);
   const profileTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -196,182 +175,162 @@ export default function Navbar() {
   }
 
   function closeProfile() {
-    profileTimer.current = setTimeout(() => {
-      setProfileOpen(false);
-    }, 150);
-  }
-
-  function handleLogout() {
-    logout();
+    profileTimer.current = setTimeout(() => setProfileOpen(false), 150);
   }
 
   if (!mounted) return null;
 
-  /* =========================
-     RENDER
-     ========================= */
-
   return (
-    <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b">
-      {/* FULL-WIDTH BAR */}
+    <nav className="navbar sticky top-0 z-50 bg-white/70 backdrop-blur-sm border-b navbar-border">
+      {/* FULL WIDTH BAR */}
       <div className="w-full">
-        {/* CONTAINED CONTENT */}
-        <div className="app-shell flex flex-wrap lg:flex-nowrap items-center gap-6 py-3">
-          {/* LEFT */}
-          <Link
-            href="/"
-            className="text-2xl font-serif whitespace-nowrap order-1"
-          >
-            Royal Center
-          </Link>
+        {/* RESPONSIVE INNER CONTAINER */}
+        <div className="px-2 sm:px-4 lg:px-8 xl:px-12">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-6 py-3">
 
-          {/* SEARCH */}
-          <div className="relative w-full order-3 mt-2 lg:mt-0 lg:order-2 lg:flex-1 lg:max-w-5xl">
-            <div className="flex">
-              <input
-                ref={inputRef}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onFocus={() => setShowHistory(true)}
-                onBlur={() => setTimeout(() => setShowHistory(false), 150)}
-                onKeyDown={handleKeyDown}
-                placeholder="Buscar productos..."
-                className="w-full px-4 py-2 rounded-l-lg bg-white/60 border border-r-0 focus:outline-none"
-              />
+            {/* BRAND */}
+            <Link
+              href="/"
+              className="navbar-brand text-4xl font-serif whitespace-nowrap order-1"
+            >
+              Royal Center
+            </Link>
 
-              <button
-                onClick={() => submitSearch(search)}
-                className="px-4 rounded-r-lg bg-[#A9A9A9] hover:bg-[#808080] border"
-              >
-                <Image src="/search.png" alt="Search" width={18} height={18} />
-              </button>
-            </div>
+            {/* SEARCH */}
+            <div className="relative w-full order-3 mt-2 lg:mt-0 lg:order-2 lg:flex-1 lg:max-w-5xl">
+              <div className="flex">
+                <input
+                  ref={inputRef}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onFocus={() => setShowHistory(true)}
+                  onBlur={() => setTimeout(() => setShowHistory(false), 150)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Buscar productos..."
+                  className="navbar-input w-full px-4 py-2 rounded-l-lg bg-white/60 border border-r-0 focus:outline-none"
+                />
 
-            {showHistory && history.length > 0 && (
-              <div className="absolute left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50">
-                {history.map((item, i) => (
-                  <div
-                    key={item}
-                    className={`flex justify-between px-3 py-2 cursor-pointer ${
-                      i === activeIndex ? "bg-black/5" : ""
-                    }`}
-                    onMouseDown={() => submitSearch(item)}
-                  >
-                    <span className="truncate">{item}</span>
-                    <button
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        deleteHistoryItem(item);
-                      }}
-                      className="text-gray-400 hover:text-black"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT */}
-          <div className="flex items-center gap-6 ml-auto order-2 lg:order-3">
-            {isAuthenticated ? (
-              <>
-                {isAdmin && (
-                  <>
-                    <Link href="/admin/orders">Admin Orders</Link>
-                    <Link href="/admin/payments">Admin Payments</Link>
-                  </>
-                )}
-
-                {/* PROFILE */}
-                <div
-                  className="relative"
-                  onMouseEnter={openProfile}
-                  onMouseLeave={closeProfile}
+                <button
+                  onClick={() => submitSearch(search)}
+                  className="navbar-btn px-4 rounded-r-lg border"
                 >
-                  <button
-                    onClick={() => router.push("/account")}
-                    className="font-medium hover:underline"
-                  >
-                    Perfil
-                  </button>
+                  <Image src="/search.png" alt="Search" width={18} height={18} />
+                </button>
+              </div>
 
-                  {profileOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border z-50">
-                      <Link
-                        href="/account"
-                        className="block px-4 py-2 hover:bg-black/5"
-                      >
-                        Cuenta de Perfil
-                      </Link>
-
-                      <Link
-                        href="/orders"
-                        className="block px-4 py-2 hover:bg-black/5"
-                      >
-                        Ordenes
-                      </Link>
-
+              {showHistory && history.length > 0 && (
+                <div className="navbar-dropdown navbar-history absolute left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50">
+                  {history.map((item, i) => (
+                    <div
+                      key={item}
+                      className={`flex justify-between px-3 py-2 cursor-pointer ${
+                        i === activeIndex ? "bg-black/5" : ""
+                      }`}
+                      onMouseDown={() => submitSearch(item)}
+                    >
+                      <span className="truncate">{item}</span>
                       <button
-                        onClick={handleLogout}
-                        className="w-full text-left px-4 py-2 hover:bg-black/5 text-red-600"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          deleteHistoryItem(item);
+                        }}
+                        className="opacity-60 hover:opacity-100"
                       >
-                        Salir de Sesión
+                        ✕
                       </button>
                     </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <Link href="/login">Iniciar Sesión</Link>
-            )}
-
-            {/* CART */}
-            <div
-              className="relative"
-              onMouseEnter={openCart}
-              onMouseLeave={closeCart}
-            >
-              <button
-                onClick={() => router.push("/checkout")}
-                className="relative w-10 h-10"
-              >
-                <Image src="/cart.webp" alt="Cart" fill />
-                {cart.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-black text-white text-xs rounded-full px-1">
-                    {cart.length}
-                  </span>
-                )}
-              </button>
-
-              {cartOpen && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-xl border">
-                  <CartSidebar
-                    cart={cart}
-                    total={total}
-                    increase={() => {}}
-                    decrease={(id) =>
-                      setCart((prev) =>
-                        prev
-                          .map((it) =>
-                            it.item_id === id
-                              ? { ...it, quantity: it.quantity - 1 }
-                              : it
-                          )
-                          .filter((it) => it.quantity > 0)
-                      )
-                    }
-                    remove={(id) =>
-                      setCart((prev) =>
-                        prev.filter((it) => it.item_id !== id)
-                      )
-                    }
-                    canIncrease={() => true}
-                  />
+                  ))}
                 </div>
               )}
             </div>
+
+            {/* RIGHT */}
+            <div className="flex items-center gap-6 ml-auto order-2 lg:order-3">
+              {isAuthenticated ? (
+                <>
+                  {isAdmin && (
+                    <>
+                      <Link href="/admin/orders">Admin Orders</Link>
+                      <Link href="/admin/payments">Admin Payments</Link>
+                    </>
+                  )}
+
+                  <div
+                    className="relative"
+                    onMouseEnter={openProfile}
+                    onMouseLeave={closeProfile}
+                  >
+                    <button className="hover:underline">Perfil</button>
+
+                    {profileOpen && (
+                      <div className="navbar-dropdown absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border z-50">
+                        <Link href="/account" className="block px-4 py-2 hover:bg-black/5">
+                          Cuenta de Perfil
+                        </Link>
+                        <Link href="/orders" className="block px-4 py-2 hover:bg-black/5">
+                          Ordenes
+                        </Link>
+                        <button
+                          onClick={logout}
+                          className="w-full text-left px-4 py-2 hover:bg-black/5"
+                        >
+                          Salir de Sesión
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <Link href="/login">Iniciar Sesión</Link>
+              )}
+
+              {/* CART */}
+              <div
+                className="relative"
+                onMouseEnter={openCart}
+                onMouseLeave={closeCart}
+              >
+                <button
+                  onClick={() => router.push("/checkout")}
+                  className="relative flex items-center"
+                >
+                  <Image src="/cart6.png" alt="Cart" width={30} height={30} className="align-middle" />
+                  {cart.length > 0 && (
+                    <span className="navbar-badge absolute -top-2 -right-2 text-xs rounded-full px-1">
+                      {cart.length}
+                    </span>
+                  )}
+                </button>
+
+                {cartOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-80">
+                    <CartSidebar
+                      cart={cart}
+                      total={total}
+                      increase={() => {}}
+                      decrease={(id) =>
+                        setCart((p) =>
+                          p
+                            .map((i) =>
+                              i.item_id === id
+                                ? { ...i, quantity: i.quantity - 1 }
+                                : i
+                            )
+                            .filter((i) => i.quantity > 0)
+                        )
+                      }
+                      remove={(id) =>
+                        setCart((p) =>
+                          p.filter((i) => i.item_id !== id)
+                        )
+                      }
+                      canIncrease={() => true}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

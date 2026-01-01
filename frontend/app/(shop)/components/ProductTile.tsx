@@ -7,21 +7,20 @@ import type { Item } from "../types";
 const IMAGE_BASE_URL =
   "https://pub-db262da1ef9140738af0ec8adade1c90.r2.dev/products";
 
-// keep these lowercase (we normalize on error)
 const IMAGE_EXTENSIONS = ["jpeg", "jpg", "webp", "png", "jfif", "heic"];
 
 type Props = {
   item: Item;
-
   cartQty: (itemId: string) => number;
   remainingStock: (item: Item) => number;
-
   addToCart: (item: Item) => void;
   increaseQty: (itemId: string) => void;
   decreaseQty: (itemId: string) => void;
   canIncrease: (itemId: string) => boolean;
-
   variant?: "featured" | "search";
+
+  /* 👇 NEW */
+  heroSize?: "large" | "small";
 
   showRemove?: boolean;
   onRemove?: () => void;
@@ -36,6 +35,7 @@ export function ProductTile({
   decreaseQty,
   canIncrease,
   variant = "featured",
+  heroSize = "large",
   showRemove,
   onRemove,
 }: Props) {
@@ -55,9 +55,19 @@ export function ProductTile({
   }
 
   /* =========================
-     FEATURED (FULL IMAGE)
+     FEATURED (HERO)
      ========================= */
   if (variant === "featured") {
+    const nameClass =
+      heroSize === "small"
+        ? "text-sm font-semibold"
+        : "text-lg font-semibold";
+
+    const priceClass =
+      heroSize === "small"
+        ? "text-[13px]"
+        : "text-sm";
+
     return (
       <div className="group h-full w-full rounded-2xl bg-white overflow-hidden transition-transform hover:-translate-y-0.5 hover:shadow-md">
         <div role="button" className="relative h-full">
@@ -72,61 +82,66 @@ export function ProductTile({
 
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />
 
+          {/* ADMIN REMOVE */}
           {showRemove && onRemove && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove();
               }}
-              className="absolute top-3 right-3 rounded-full bg-white/90 px-3 py-1 text-xs hover:bg-white"
+              className="absolute top-3 left-3 z-20 rounded-full bg-white/90 px-3 py-1 text-xs hover:bg-white"
             >
               Quitar
             </button>
           )}
 
-          <div className="absolute inset-x-0 bottom-0 p-4 text-white">
-            <div className="flex items-end justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate font-semibold">{item.name}</div>
-                <div className="text-sm opacity-90">
-                  ${item.price_usd.toFixed(2)}
-                </div>
-              </div>
+          {/* TOP RIGHT ACTION */}
+          {qty <= 0 ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                addToCart(item);
+              }}
+              disabled={outOfStock}
+              className="absolute top-3 right-3 z-20 rounded-xl bg-[var(--navbar-accent)] px-4 py-2 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-60"
+            >
+              Agregar
+            </button>
+          ) : (
+            <div
+              className="absolute top-3 right-3 z-20 flex items-center gap-1.5 rounded-xl bg-[var(--navbar-accent-soft)] px-2 py-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="h-6 w-6 rounded-md text-white hover:bg-white/10"
+                onClick={() => decreaseQty(item.id)}
+              >
+                −
+              </button>
 
-              {qty <= 0 ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    addToCart(item);
-                  }}
-                  disabled={outOfStock}
-                  className="rounded-xl bg-white/95 px-4 py-2 text-sm font-medium text-black hover:bg-white disabled:opacity-60"
-                >
-                  Agregar
-                </button>
-              ) : (
-                <div
-                  className="flex items-center gap-2 rounded-xl bg-white/95 px-2 py-2 text-black"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    className="h-8 w-8 rounded-lg hover:bg-black/5"
-                    onClick={() => decreaseQty(item.id)}
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm font-semibold">
-                    {qty}
-                  </span>
-                  <button
-                    className="h-8 w-8 rounded-lg hover:bg-black/5 disabled:opacity-50"
-                    onClick={() => increaseQty(item.id)}
-                    disabled={!canIncrease(item.id)}
-                  >
-                    +
-                  </button>
-                </div>
-              )}
+              <span className="w-4 text-center text-xs font-semibold text-white">
+                {qty}
+              </span>
+
+              <button
+                className="h-6 w-6 rounded-md text-white hover:bg-white/10 disabled:opacity-40"
+                onClick={() => increaseQty(item.id)}
+                disabled={!canIncrease(item.id)}
+              >
+                +
+              </button>
+            </div>
+          )}
+
+          {/* BOTTOM TEXT */}
+          <div className="absolute inset-x-0 bottom-0 p-4 text-white">
+            <div className="min-w-0">
+              <div className={`truncate ${nameClass}`}>
+                {item.name}
+              </div>
+              <div className={`opacity-90 ${priceClass}`}>
+                ${item.price_usd.toFixed(2)}
+              </div>
             </div>
           </div>
         </div>
@@ -135,7 +150,7 @@ export function ProductTile({
   }
 
   /* =========================
-     SEARCH (CLASSIC CARD)
+     SEARCH (UNCHANGED)
      ========================= */
   return (
     <div className="h-full min-h-[460px] w-full rounded-xl border border-gray-200 bg-white flex flex-col hover:shadow-sm transition-shadow">
@@ -154,34 +169,9 @@ export function ProductTile({
         <div className="text-sm font-medium leading-snug line-clamp-2">
           {item.name}
         </div>
-
         <div className="text-base font-semibold">
           ${item.price_usd.toFixed(2)}
         </div>
-
-        {qty <= 0 ? (
-          <button
-            onClick={() => addToCart(item)}
-            disabled={outOfStock}
-            className="mt-1 w-fit rounded-full bg-yellow-400 px-3 py-1.5 text-sm font-medium text-black hover:bg-yellow-300 disabled:opacity-50"
-          >
-            Agregar
-          </button>
-        ) : (
-          <div className="mt-1 flex items-center gap-2 rounded-full border px-2 py-1 w-fit">
-            <button onClick={() => decreaseQty(item.id)} className="px-1">
-              −
-            </button>
-            <span className="text-sm font-semibold">{qty}</span>
-            <button
-              onClick={() => increaseQty(item.id)}
-              disabled={!canIncrease(item.id)}
-              className="px-1 disabled:opacity-50"
-            >
-              +
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
