@@ -1,5 +1,5 @@
 /**
- * ERP → shop_db categories & subcategories sync
+ * ERP → WEB_db categories & subcategories sync
  * FK-safe (two-pass)
  * Re-runnable
  * Azure SQL compatible
@@ -12,8 +12,8 @@ const sql = require("mssql");
    SOURCE DATABASE (ERP)
    ========================= */
 const sourceConfig = {
-  server: process.env.ERP_DB_SERVER,
-  port: Number(process.env.ERP_DB_PORT || 1433),
+  server: process.env.COMMON_SERVER,
+  port: Number(process.env.COMMON_PORT || 1433),
   user: process.env.ERP_DB_USER,
   password: process.env.ERP_DB_PASS,
   database: process.env.ERP_DB_NAME,
@@ -27,13 +27,14 @@ const sourceConfig = {
    TARGET DATABASE (AZURE)
    ========================= */
 const targetConfig = {
-  server: process.env.AZ_DB_SERVER,   // xxx.database.windows.net
-  user: process.env.AZ_DB_USER,
-  password: process.env.AZ_DB_PASS,
-  database: process.env.AZ_DB_NAME,   // shop_db
+  server: process.env.COMMON_SERVER,
+  port: Number(process.env.COMMON_PORT || 1433),
+  user: process.env.WEB_DB_USER,
+  password: process.env.WEB_DB_PASS,
+  database: process.env.WEB_DB_NAME,
   options: {
-    encrypt: true,
-    trustServerCertificate: false,
+    encrypt: false,
+    trustServerCertificate: true,
   },
   pool: {
     max: 5,
@@ -59,7 +60,7 @@ async function run() {
     console.log(`📦 Fetched ${categories.length} category records`);
 
     /* ---------- CONNECT TARGET ---------- */
-    console.log("🔌 Connecting to Azure shop_db...");
+    console.log("🔌 Connecting to Database: Website...");
     targetPool = await new sql.ConnectionPool(targetConfig).connect();
 
     /* ======================================================

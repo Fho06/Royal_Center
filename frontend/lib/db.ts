@@ -1,17 +1,18 @@
 import sql from "mssql";
 
-if (!process.env.AZ_DB_SERVER) {
-  throw new Error("AZ_DB_SERVER is not defined");
+if (!process.env.COMMON_SERVER) {
+  throw new Error("COMMON_SERVER is not defined");
 }
 
 const config: sql.config = {
-  user: process.env.AZ_DB_USER,
-  password: process.env.AZ_DB_PASS,
-  server: process.env.AZ_DB_SERVER,
-  database: process.env.AZ_DB_NAME,
+  user: process.env.WEB_DB_USER,
+  password: process.env.WEB_DB_PASS,
+  server: process.env.COMMON_SERVER,
+  port: Number(process.env.COMMON_PORT) || 1433,
+  database: process.env.WEB_DB_NAME,
   options: {
-    encrypt: true,
-    trustServerCertificate: false,
+    encrypt: false,
+    trustServerCertificate: true,
   },
   pool: {
     max: 5,
