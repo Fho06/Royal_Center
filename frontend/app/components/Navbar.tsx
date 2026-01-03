@@ -38,10 +38,23 @@ function getToken() {
 export default function Navbar() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  
 
   const { isAuthenticated, user, logout } = useAuth();
   const isAdmin = user?.role === "admin";
-  const { cart, cartCount, setCart } = useCart();
+  const {
+    cart,
+    cartCount,
+    increaseQty,
+    decreaseQty,
+    clearCart
+  } = useCart();
+
+  const [location, setLocation] = useState(
+    searchParams.get("location") || "29"
+  );
+  const [showLocations, setShowLocations] = useState(false);
+
 
   /* mounted guard */
   const [mounted, setMounted] = useState(false);
@@ -63,6 +76,24 @@ export default function Navbar() {
   useEffect(() => {
     setSearch(searchParams.get("search") || "");
   }, [searchParams]);
+
+  useEffect(() => {
+    setLocation(searchParams.get("location") || "29");
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname === "/" &&
+      !searchParams.get("location")
+    ) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("location", "29");
+      router.replace(`/?${params.toString()}`);
+    }
+  }, [searchParams, router]);
+
+
 
   /* load history */
   useEffect(() => {
@@ -110,7 +141,8 @@ export default function Navbar() {
 
     setShowHistory(false);
     setActiveIndex(-1);
-    router.push(`/?search=${encodeURIComponent(q)}`);
+    router.push(`/?search=${encodeURIComponent(q)}&location=${encodeURIComponent(location)}`
+    );
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -217,7 +249,52 @@ export default function Navbar() {
 
             {/* SEARCH */}
             <div className="relative w-full order-3 mt-2 lg:mt-0 lg:order-2 lg:flex-1 lg:max-w-5xl">
-              <div className="flex">
+              <div className="flex relative h-12 sm:h-11">
+                {/* LOCATION BUTTON */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowLocations((v) => !v)}
+                    className="
+                      navbar-btn
+                      h-full
+                      px-4
+                      rounded-l-lg
+                      border
+                      flex items-center justify-center
+                    "
+                  >
+                    <Image src="/location.png" alt="Location" width={18} height={18} />
+                  </button>
+
+                  {showLocations && (
+                    <div
+                      className="absolute left-0 top-full mt-1 w-28 bg-white border rounded-lg shadow-lg z-50"
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      {["29"].map((loc) => (
+                        <button
+                          key={loc}
+                          onClick={() => {
+                            setLocation(loc);
+                            setShowLocations(false);
+
+                            const params = new URLSearchParams(searchParams.toString());
+                            params.set("location", loc);
+                            router.push(`/?${params.toString()}`);
+                          }}
+                          className={`block w-full text-left px-3 py-2 hover:bg-black/5 ${
+                            location === loc ? "font-semibold" : ""
+                          }`}
+                        >
+                          {`Ubicación ${loc}`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* SEARCH INPUT */}
                 <input
                   ref={inputRef}
                   value={search}
@@ -226,16 +303,18 @@ export default function Navbar() {
                   onBlur={() => setTimeout(() => setShowHistory(false), 150)}
                   onKeyDown={handleKeyDown}
                   placeholder="Buscar productos..."
-                  className="navbar-input w-full px-4 py-2 rounded-l-lg bg-white/60 border border-r-0 focus:outline-none"
+                  className="navbar-input w-full px-4 py-2 bg-white/60 border border-r-0 focus:outline-none"
                 />
 
+                {/* SEARCH BUTTON */}
                 <button
                   onClick={() => submitSearch(search)}
                   className="navbar-btn px-4 rounded-r-lg border"
                 >
-                  <Image src="/search.png" alt="Search" width={18} height={18} />
+                  <Image src="/search.png" alt="Search" width={18} height={15} />
                 </button>
               </div>
+
 
               {showHistory && history.length > 0 && (
                 <div className="navbar-dropdown navbar-history absolute left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50">
@@ -269,8 +348,8 @@ export default function Navbar() {
                 <>
                   {isAdmin && (
                     <>
-                      <Link href="/admin/orders">Admin Orders</Link>
-                      <Link href="/admin/payments">Admin Payments</Link>
+                      <Link href="/admin/orders">Admin Ordenes</Link>
+                      <Link href="/admin/payments">Admin Pagos</Link>
                     </>
                   )}
 
@@ -338,24 +417,9 @@ export default function Navbar() {
                     <CartSidebar
                       cart={cart}
                       total={total}
-                      increase={() => {}}
-                      decrease={(id) =>
-                        setCart((p) =>
-                          p
-                            .map((i) =>
-                              i.item_id === id
-                                ? { ...i, quantity: i.quantity - 1 }
-                                : i
-                            )
-                            .filter((i) => i.quantity > 0)
-                        )
-                      }
-                      remove={(id) =>
-                        setCart((p) =>
-                          p.filter((i) => i.item_id !== id)
-                        )
-                      }
-                      canIncrease={() => true}
+                      increase={increaseQty}
+                      decrease={decreaseQty}
+                      remove={clearCart}
                     />
                   </div>
                 )}

@@ -14,6 +14,7 @@ import {
 } from "./(shop)/components/FeaturedGrid";
 import { AdminProductSearchModal } from "./(shop)/components/AdminProductSearchModal";
 import { SearchFilters } from "./(shop)/components/SearchFilters";
+import { LOCATION_MAP } from "@/lib/locationMap";
 
 
 const ITEMS_PER_PAGE = 20;
@@ -38,7 +39,6 @@ export default function HomeClient() {
     addToCart,
     increaseQty,
     decreaseQty,
-    canIncrease,
   } = useCart();
 
   const { user } = useAuth();
@@ -53,6 +53,9 @@ export default function HomeClient() {
      ========================= */
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const uiLocation = searchParams.get("location") ?? "29";
+  const location = LOCATION_MAP[uiLocation] ?? "29";
+
 
   /* =========================
      DRAFT FILTERS (UI ONLY)
@@ -200,11 +203,15 @@ export default function HomeClient() {
   const [modalOpen, setModalOpen] = useState(false);
   const [activePick, setActivePick] = useState<ActivePick>(null);
 
+
   async function loadFeatured() {
-    const res = await fetch(`/api/featured?bust=${Date.now()}`, {
-      cache: "no-store",
-    });
+    const res = await fetch(
+      `/api/featured?location=${encodeURIComponent(location)}&bust=${Date.now()}`,
+      { cache: "no-store" }
+    );
+
     if (!res.ok) return;
+
     const data = await res.json();
     setFeatured(data.featured ?? {});
   }
@@ -212,7 +219,7 @@ export default function HomeClient() {
   useEffect(() => {
     if (!hydrated) return;
     loadFeatured();
-  }, [hydrated]);
+  }, [hydrated,location]);
 
   async function assignFeatured(
     slot: FeaturedSlot,
@@ -266,7 +273,6 @@ export default function HomeClient() {
             addToCart={addToCart}
             increaseQty={increaseQty}
             decreaseQty={decreaseQty}
-            canIncrease={canIncrease}
           />
         )}
 
@@ -307,7 +313,6 @@ export default function HomeClient() {
                 addToCart={addToCart}
                 increaseQty={increaseQty}
                 decreaseQty={decreaseQty}
-                canIncrease={canIncrease}
                 variant="search"
               />
 

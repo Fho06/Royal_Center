@@ -81,15 +81,15 @@ export default function AdminPaymentsPage() {
             <p className="font-semibold">
               Payment #{p.id}
             </p>
-            <p>User: {p.email}</p>
-            <p>Order: #{p.order_id}</p>
-            <p>Bank: {p.sender_bank}</p>
+            <p>Usuario: {p.email}</p>
+            <p>Orden: #{p.order_id}</p>
+            <p>Banco: {p.sender_bank}</p>
             <p>Ref: {p.reference_number}</p>
             <p>
-              Amount: ${p.amount.toFixed(2)}
+              Monto: ${p.amount.toFixed(2)}
             </p>
             {p.phone_last4 && (
-              <p>Phone: ****{p.phone_last4}</p>
+              <p>Teléfono: ****{p.phone_last4}</p>
             )}
 
             <div className="flex gap-2 mt-3">
@@ -97,13 +97,13 @@ export default function AdminPaymentsPage() {
                 onClick={() => act(p.id, "approve")}
                 className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
               >
-                Approve
+                Aprovar
               </button>
               <button
                 onClick={() => act(p.id, "reject")}
                 className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
               >
-                Reject
+                Rechazar
               </button>
             </div>
           </div>

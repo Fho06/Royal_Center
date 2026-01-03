@@ -1,33 +1,40 @@
+"use client";
+
 import { useRouter } from "next/navigation";
+import type { CartItem } from "@/app/context/CartContext";
 
 type Props = {
-  cart: any[];
+  cart: CartItem[];
   total: number;
-  increase: (id: string) => void;
-  decrease: (id: string) => void;
-  remove: (id: string) => void;
-  canIncrease: (id: string) => boolean;
+  increase: (itemId: string) => void;
+  decrease: (itemId: string) => void;
+  remove: (itemId: string) => void;
 };
 
-export function CartSidebar(props: Props) {
+export function CartSidebar({
+  cart,
+  total,
+  increase,
+  decrease,
+  remove,
+}: Props) {
   const router = useRouter();
 
   return (
     <div className="cart-sidebar">
-      <aside
-        className="rounded-2xl bg-white p-4 elevation-strong">
+      <aside className="rounded-2xl bg-white p-4 elevation-strong">
         <h2 className="text-lg font-semibold mb-2 text-black">
           Carrito
         </h2>
 
-        {props.cart.length === 0 && (
+        {cart.length === 0 && (
           <p className="text-gray-500 text-sm">
             El carrito está vacío
           </p>
         )}
 
         <div className="space-y-3">
-          {props.cart.map((item) => (
+          {cart.map((item) => (
             <div
               key={item.item_id}
               className="flex items-start justify-between gap-3"
@@ -45,7 +52,7 @@ export function CartSidebar(props: Props) {
                 {/* Quantity */}
                 <div className="flex items-center rounded-xl border border-gray-200 bg-white">
                   <button
-                    onClick={() => props.decrease(item.item_id)}
+                    onClick={() => decrease(item.item_id)}
                     className="h-8 w-8 rounded-l-xl hover:bg-black/5"
                   >
                     −
@@ -56,9 +63,8 @@ export function CartSidebar(props: Props) {
                   </span>
 
                   <button
-                    onClick={() => props.increase(item.item_id)}
-                    disabled={!props.canIncrease(item.item_id)}
-                    className="h-8 w-8 rounded-r-xl hover:bg-black/5 disabled:opacity-50"
+                    onClick={() => increase(item.item_id)}
+                    className="h-8 w-8 rounded-r-xl hover:bg-black/5"
                   >
                     +
                   </button>
@@ -66,7 +72,7 @@ export function CartSidebar(props: Props) {
 
                 {/* Remove */}
                 <button
-                  onClick={() => props.remove(item.item_id)}
+                  onClick={() => remove(item.item_id)}
                   className="h-8 w-8 rounded-xl border border-gray-200 hover:bg-black/5"
                   aria-label="Remove"
                 >
@@ -81,13 +87,14 @@ export function CartSidebar(props: Props) {
           <p className="flex items-center justify-between text-sm">
             <span className="text-gray-600">Total</span>
             <span className="font-semibold text-black">
-              ${props.total.toFixed(2)}
+              ${total.toFixed(2)}
             </span>
           </p>
 
           <button
             onClick={() => router.push("/checkout")}
-            className="mt-3 w-full rounded-xl bg-[var(--reg-accent)] !text-white py-3 text-sm font-semibold hover:brightness-95">
+            className="mt-3 w-full rounded-xl bg-[var(--reg-accent)] !text-white py-3 text-sm font-semibold hover:brightness-95"
+          >
             Continuar al Carrito
           </button>
         </div>

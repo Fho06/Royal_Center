@@ -15,7 +15,13 @@ type Step = "checkout" | "review";
 type PickupLocation = "royal_center_main";
 
 export default function CheckoutPage() {
-  const { cart, setCart } = useCart();
+  const {
+    cart,
+    increaseQty,
+    decreaseQty,
+    clearCart,
+  } = useCart();
+  
   const router = useRouter();
 
   const [step, setStep] = useState<Step>("checkout");
@@ -58,30 +64,6 @@ export default function CheckoutPage() {
   useEffect(() => {
     loadAddresses();
   }, []);
-
-  function increaseQty(id: string) {
-    setCart(c =>
-      c.map(i =>
-        i.item_id === id && i.quantity < i.stock
-          ? { ...i, quantity: i.quantity + 1 }
-          : i
-      )
-    );
-  }
-
-  function decreaseQty(id: string) {
-    setCart(c =>
-      c
-        .map(i =>
-          i.item_id === id ? { ...i, quantity: i.quantity - 1 } : i
-        )
-        .filter(i => i.quantity > 0)
-    );
-  }
-
-  function removeFromCart(id: string) {
-    setCart(c => c.filter(i => i.item_id !== id));
-  }
 
   const subtotal = useMemo(
     () => cart.reduce((s, i) => s + i.price * i.quantity, 0),
@@ -150,9 +132,6 @@ export default function CheckoutPage() {
               <CartItemRow
                 key={item.item_id}
                 item={item}
-                increaseQty={increaseQty}
-                decreaseQty={decreaseQty}
-                removeFromCart={removeFromCart}
               />
             ))}
             </div>
@@ -175,9 +154,6 @@ export default function CheckoutPage() {
                   <CartItemRow
                     key={item.item_id}
                     item={item}
-                    increaseQty={increaseQty}
-                    decreaseQty={decreaseQty}
-                    removeFromCart={removeFromCart}
                   />
                 ))}
               </div>
@@ -281,7 +257,7 @@ export default function CheckoutPage() {
             onClick={() => setDeliveryOpen(v => !v)}
             className="w-full flex justify-between items-center p-4 font-semibold"
           >
-            <span>Entrega</span>
+            <span>Método de entrega</span>
             <span className={`transition-transform ${deliveryOpen ? "rotate-180" : ""}`}>
               ▾
             </span>
@@ -295,7 +271,7 @@ export default function CheckoutPage() {
                   checked={fulfillmentType === "delivery"}
                   onChange={() => setFulfillmentType("delivery")}
                 />
-                Delivery
+                Entrega a domicilio
               </label>
               <label className="flex gap-2">
                 <input
@@ -303,7 +279,7 @@ export default function CheckoutPage() {
                   checked={fulfillmentType === "pickup"}
                   onChange={() => setFulfillmentType("pickup")}
                 />
-                Pick Up
+                Retiro en tienda
               </label>
             </div>
           </AnimatedDropdown>

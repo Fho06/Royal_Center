@@ -6,23 +6,38 @@ import jwt from "jsonwebtoken";
 /* =========================
    HELPERS
    ========================= */
+
 function formatRIF(raw: string) {
+  if (!raw) return null;
+
   const cleaned = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (cleaned.length < 9) return null;
 
-  const letter = cleaned[0];
-  const body = cleaned.slice(1, -1);
-  const digit = cleaned.slice(-1);
-
-  return `${letter}-${body}-${digit}`;
+  return raw
 }
+
+/* =========================
+   ACCOUNT TYPES
+   ========================= */
+const VALID_ACCOUNT_TYPES = [
+  "natural",
+  "extranjero",
+  "juridico",
+  "rif_persona_natural",
+  "rif_v",
+  "rif_e",
+  "gobierno",
+  "pasaporte",
+] as const;
+
+type AccountType = (typeof VALID_ACCOUNT_TYPES)[number];
 
 export async function POST(req: Request) {
   /* =========================
-     ENV VALIDATION (FAIL FAST)
+     ENV VALIDATION
      ========================= */
   if (!process.env.JWT_SECRET) {
-    console.error("JWT_SECRET is not defined");
+    console.error("❌ JWT_SECRET missing");
     return NextResponse.json(
       { error: "Server configuration error" },
       { status: 500 }
@@ -30,6 +45,10 @@ export async function POST(req: Request) {
   }
 
   try {
+    const body = await req.json();
+
+    console.log("📥 Register payload:", body);
+
     const {
       phone, // WITHOUT +58
       email,
@@ -41,67 +60,95 @@ export async function POST(req: Request) {
       rif,
       termsAccepted,
       passcode, // 4 digits
-    } = await req.json();
+    } = body;
 
     /* =========================
        BASIC VALIDATION
        ========================= */
     if (!phone || !termsAccepted || !/^\d{4}$/.test(passcode)) {
+      console.error("❌ Missing basic fields");
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    if (!["natural", "juridico"].includes(accountType)) {
+    const normalizedAccountType = String(accountType).toLowerCase();
+
+    if (
+      !VALID_ACCOUNT_TYPES.includes(
+        normalizedAccountType as AccountType
+      )
+    ) {
+      console.error(
+        "❌ Invalid account type:",
+        normalizedAccountType
+      );
       return NextResponse.json(
         { error: "Invalid account type" },
         { status: 400 }
       );
     }
 
-    const fullPhone = `+58${phone}`;
+    const isJuridico = normalizedAccountType === "juridico";
+
+    /* =========================
+       RIF (REQUIRED FOR ALL)
+       ========================= */
+    const formattedRif = formatRIF(rif);
+    if (!formattedRif) {
+      console.error("❌ Invalid RIF:", rif);
+      return NextResponse.json(
+        { error: "Invalid RIF format" },
+        { status: 400 }
+      );
+    }
 
     /* =========================
        ACCOUNT TYPE VALIDATION
        ========================= */
-    let formattedRif: string | null = null;
-
-    if (accountType === "natural") {
-      if (!firstName || !lastName || !["male", "female"].includes(gender)) {
+    if (isJuridico) {
+      if (!companyName) {
+        console.error("❌ Missing company name");
         return NextResponse.json(
-          { error: "Natural requires first name, last name, and gender" },
+          { error: "Company name is required" },
           { status: 400 }
         );
       }
     } else {
-      if (!companyName || !rif) {
+      if (
+        !firstName ||
+        !lastName ||
+        !["femenino", "masculino"].includes(gender)
+      ) {
+        console.error("❌ Missing personal info", {
+          firstName,
+          lastName,
+          gender,
+        });
         return NextResponse.json(
-          { error: "Juridico requires company name and RIF" },
-          { status: 400 }
-        );
-      }
-
-      formattedRif = formatRIF(rif);
-      if (!formattedRif) {
-        return NextResponse.json(
-          { error: "Invalid RIF format" },
+          { error: "Información Personal Requerida" },
           { status: 400 }
         );
       }
     }
 
-    /* =========================
-       HASH PASSCODE
-       ========================= */
+    const fullPhone = `+58${phone}`;
     const passcodeHash = await bcrypt.hash(passcode, 10);
 
+    console.log("📝 Creating user:", {
+      phone: fullPhone,
+      accountType: normalizedAccountType,
+      rif: formattedRif,
+      isJuridico,
+    });
+
+    /* =========================
+       DB INSERT (TRANSACTION)
+       ========================= */
     const pool = await getPool();
     const tx = pool.transaction();
 
-    /* =========================
-       TRANSACTION START
-       ========================= */
     await tx.begin();
 
     try {
@@ -109,12 +156,32 @@ export async function POST(req: Request) {
         .request()
         .input("phone", sql.VarChar(15), fullPhone)
         .input("email", sql.VarChar(255), email || null)
-        .input("account_type", sql.VarChar(10), accountType)
-        .input("first_name", sql.VarChar(100), firstName || null)
-        .input("last_name", sql.VarChar(150), lastName || null)
-        .input("gender", sql.VarChar(6), gender || null)
-        .input("company_name", sql.VarChar(255), companyName || null)
-        .input("rif", sql.VarChar(15), formattedRif)
+        .input(
+          "account_type",
+          sql.VarChar(30),
+          normalizedAccountType
+        )
+        .input(
+          "first_name",
+          sql.VarChar(100),
+          isJuridico ? null : firstName
+        )
+        .input(
+          "last_name",
+          sql.VarChar(150),
+          isJuridico ? null : lastName
+        )
+        .input(
+          "gender",
+          sql.VarChar(10),
+          isJuridico ? null : gender
+        )
+        .input(
+          "company_name",
+          sql.VarChar(255),
+          isJuridico ? companyName : null
+        )
+        .input("rif", sql.VarChar(20), formattedRif)
         .input("passcode_hash", sql.VarChar(255), passcodeHash)
         .input("terms_accepted_at", sql.DateTime, new Date())
         .query(`
@@ -161,22 +228,25 @@ export async function POST(req: Request) {
       );
 
       await tx.commit();
-      return NextResponse.json({ token });
 
+      console.log("✅ User created:", user.user_id);
+
+      return NextResponse.json({ token });
     } catch (err) {
       await tx.rollback();
+      console.error("🔥 Transaction failed:", err);
       throw err;
     }
-
   } catch (err: any) {
     if (err?.number === 2627) {
+      console.error("⚠️ Duplicate account");
       return NextResponse.json(
         { error: "Account already exists" },
         { status: 409 }
       );
     }
 
-    console.error("Register-complete error:", err);
+    console.error("🔥 Register-complete error:", err);
     return NextResponse.json(
       { error: "Registration failed" },
       { status: 500 }

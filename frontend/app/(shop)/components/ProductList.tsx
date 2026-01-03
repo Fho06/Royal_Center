@@ -8,7 +8,6 @@ type Props = {
   addToCart: (item: Item) => void;
   increaseQty: (itemId: string) => void;
   decreaseQty: (itemId: string) => void;
-  canIncrease: (itemId: string) => boolean;
   variant?: "featured" | "search";
 };
 
@@ -19,7 +18,7 @@ export function ProductList({
   addToCart,
   increaseQty,
   decreaseQty,
-  canIncrease,
+
 }: Props) {
   return (
     /* AMAZON-STYLE CONTAINMENT */
@@ -34,7 +33,6 @@ export function ProductList({
             addToCart={addToCart}
             increaseQty={increaseQty}
             decreaseQty={decreaseQty}
-            canIncrease={canIncrease}
             variant="search"
           />
         ))}

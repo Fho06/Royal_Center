@@ -47,21 +47,21 @@ export default function LoginClient() {
     <div className="flex min-h-screen items-center justify-center">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-4 rounded border p-6"
+        className="w-full max-w-sm space-y-4 checkout-card r p-6"
       >
-        <h1 className="text-xl font-semibold">Login</h1>
+        <h1 className="text-xl font-semibold">Iniciar sesión</h1>
 
         {error && <p className="text-red-600">{error}</p>}
 
         {/* PHONE */}
         <div className="flex">
-          <span className="flex items-center rounded-l border px-3 bg-gray-100">
+          <span className="flex items-center rounded-l-md bg-[var(--reg-accent-soft)] -100 px-3 elevation-md">
             +58
           </span>
           <input
             type="tel"
             placeholder="0123456789"
-            className="w-full rounded-r border p-2"
+            className="w-full inside-card !rounded-r-md !rounded-l-none p-2"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             required
@@ -75,7 +75,7 @@ export default function LoginClient() {
           pattern="\d{4}"
           maxLength={4}
           placeholder="Código de Acceso (4 Dígitos)"
-          className="w-full rounded border p-2 text-center tracking-widest"
+          className="w-full checkout-card p-2 text-center tracking-widest"
           value={passcode}
           onChange={(e) => setPasscode(e.target.value)}
           required
@@ -83,13 +83,13 @@ export default function LoginClient() {
 
         <button
           type="submit"
-          className="w-full rounded bg-black p-2 text-white"
+          className="w-full rounded-lg bg-[var(--reg-accent)] p-2 text-white font-bold"
         >
-          Log In
+          Iniciar sesión
         </button>
 
         <p className="text-sm">
-          Don’t have an account?{" "}
+          ¿No tienes una cuenta?{" "}
           <a
             href={
               nextParam
@@ -98,7 +98,7 @@ export default function LoginClient() {
             }
             className="underline"
           >
-            Sign up
+            Registrar Cuenta
           </a>
         </p>
       </form>

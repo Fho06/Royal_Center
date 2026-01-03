@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
+import { Item } from "@/app/(shop)/types";
 
 /* =========================
    TYPES
@@ -10,34 +11,28 @@ import { useAuth } from "@/app/context/AuthContext";
 export type CartItem = {
   item_id: string;
   name: string;
-  price: number;
-  quantity: number;
+  price: number;     // snapshot
+  quantity: number;  // requested qty
   stock: number;
 };
+
 
 type CartContextType = {
   cart: CartItem[];
   setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
 
   cartQty: (itemId: string) => number;
-  remainingStock: (item: { id: string; stock: number }) => number;
+  remainingStock: (item: Item) => number;
 
-  addToCart: (item: {
-    id: string;
-    name: string;
-    price_usd: number;
-    stock: number;
-  }) => void;
+  addToCart: (item: Item) => void;
 
-  increaseQty: (itemId: string) => void;
+  increaseQty: (item: string) => void;
   decreaseQty: (itemId: string) => void;
 
-  canIncrease: (itemId: string) => boolean;
-
   clearCart: () => void;
-
-  cartCount: number; // ✅ TOTAL QUANTITY
+  cartCount: number;
 };
+
 
 const CartContext = createContext<CartContextType | null>(null);
 
@@ -110,26 +105,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
      ========================= */
 
   function cartQty(itemId: string) {
-    return cart.find(c => c.item_id === itemId)?.quantity || 0;
+    return cart.find(c => c.item_id === itemId)?.quantity ?? 0;
   }
 
-  function remainingStock(item: { id: string; stock: number }) {
-    const cartItem = cart.find(c => c.item_id === item.id);
-    if (!cartItem) return item.stock;
-    return cartItem.stock - cartItem.quantity;
-  }
-
-  function canIncrease(itemId: string) {
-    const cartItem = cart.find(c => c.item_id === itemId);
-    if (!cartItem) return true;
-    return cartItem.quantity < cartItem.stock;
+  function remainingStock(item: Item) {
+    return Math.max(0, item.available_stock - cartQty(item.id));
   }
 
   function addToCart(item: {
     id: string;
     name: string;
     price_usd: number;
-    stock: number;
+    available_stock: number;
   }) {
     setCart(prev => {
       const existing = prev.find(c => c.item_id === item.id);
@@ -151,7 +138,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           name: item.name,
           price: item.price_usd,
           quantity: 1,
-          stock: item.stock,
+          stock: item.available_stock, // ✅ snapshot
         },
       ];
     });
@@ -159,13 +146,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   function increaseQty(itemId: string) {
     setCart(prev =>
-      prev.map(c =>
-        c.item_id === itemId && c.quantity < c.stock
-          ? { ...c, quantity: c.quantity + 1 }
-          : c
-      )
+      prev.map(c => {
+        if (c.item_id !== itemId) return c;
+        if (c.quantity >= c.stock) return c;
+        return { ...c, quantity: c.quantity + 1 };
+      })
     );
   }
+
+
+
 
   function decreaseQty(itemId: string) {
     setCart(prev =>
@@ -195,7 +185,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         addToCart,
         increaseQty,
         decreaseQty,
-        canIncrease,
         clearCart,
         cartCount, // ✅ EXPOSED HERE
       }}

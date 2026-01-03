@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { useCart } from "@/app/context/CartContext";
+import type { CartItem } from "@/app/context/CartContext";
 
 const IMAGE_BASE_URL =
   "https://pub-db262da1ef9140738af0ec8adade1c90.r2.dev/products";
@@ -9,18 +11,12 @@ const IMAGE_BASE_URL =
 const IMAGE_EXTENSIONS = ["jpeg", "jpg", "webp", "png", "jfif", "heic"];
 
 type Props = {
-  item: any;
-  increaseQty: (id: string) => void;
-  decreaseQty: (id: string) => void;
-  removeFromCart: (id: string) => void;
+  item: CartItem;
 };
 
-export function CartItemRow({
-  item,
-  increaseQty,
-  decreaseQty,
-  removeFromCart,
-}: Props) {
+export function CartItemRow({ item }: Props) {
+  const { increaseQty, decreaseQty, clearCart } = useCart();
+
   const [extIndex, setExtIndex] = useState(0);
   const [failed, setFailed] = useState(false);
 
@@ -56,19 +52,21 @@ export function CartItemRow({
 
         <div className="mt-2 flex items-center gap-2">
           <div className="flex items-center rounded-xl border border-gray-200 bg-white">
-          <button
-            onClick={() => decreaseQty(item.item_id)}
-            className="h-8 w-8 rounded-l-xl hover:bg-black/5 disabled:opacity-50"
-          >
-            −
-          </button>
-          <span className="w-4 text-center">{item.quantity}</span>
-          <button
-            onClick={() => increaseQty(item.item_id)}
-            className="h-8 w-8 rounded-r-xl hover:bg-black/5 disabled:opacity-50"
-          >
-            +
-          </button>
+            <button
+              onClick={() => decreaseQty(item.item_id)}
+              className="h-8 w-8 rounded-l-xl hover:bg-black/5"
+            >
+              −
+            </button>
+
+            <span className="w-4 text-center">{item.quantity}</span>
+
+            <button
+              onClick={() => increaseQty(item.item_id)}
+              className="h-8 w-8 rounded-r-xl hover:bg-black/5"
+            >
+              +
+            </button>
           </div>
         </div>
       </div>
@@ -80,7 +78,9 @@ export function CartItemRow({
         </div>
 
         <button
-          onClick={() => removeFromCart(item.item_id)}
+          onClick={() =>
+            decreaseQty(item.item_id) /* will remove when qty hits 0 */
+          }
           className="text-xs text-red-600 hover:underline"
         >
           Eliminar
