@@ -66,7 +66,6 @@ type Props = {
   addToCart: (item: Item) => void;
   increaseQty: (itemId: string) => void;
   decreaseQty: (itemId: string) => void;
-  canIncrease: (itemId: string) => boolean;
 };
 
 /* =========================
@@ -83,7 +82,6 @@ export function FeaturedGrid({
   addToCart,
   increaseQty,
   decreaseQty,
-  canIncrease,
 }: Props) {
   /* ---------- HERO TILE (BIG) ---------- */
   const renderHero = (slot: FeaturedSlot) => {
@@ -99,9 +97,8 @@ export function FeaturedGrid({
             addToCart={addToCart}
             increaseQty={increaseQty}
             decreaseQty={decreaseQty}
-            canIncrease={canIncrease}
             variant="featured"
-            heroSize="large"        // ✅ ALWAYS LARGE
+            heroSize="large" 
             showRemove={isAdmin}
             onRemove={() => onRemoveClick(slot, 1)}
           />
@@ -132,7 +129,6 @@ export function FeaturedGrid({
                     addToCart={addToCart}
                     increaseQty={increaseQty}
                     decreaseQty={decreaseQty}
-                    canIncrease={canIncrease}
                     variant="featured"
                     heroSize="small"
                     showRemove={isAdmin}

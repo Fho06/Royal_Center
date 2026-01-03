@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { apiRequest } from "@/lib/api";
 import { Item } from "../types";
+import { LOCATION_MAP } from "@/lib/locationMap";
+
 
 type Params = {
   search: string;
@@ -38,6 +41,11 @@ export function useItems({
     useState<PriceBounds | null>(null);
   const [error, setError] = useState("");
 
+  const searchParams = useSearchParams();
+  const uiLocation = searchParams.get("location") ?? "29";
+  const location = LOCATION_MAP[uiLocation] ?? "all";
+
+
   useEffect(() => {
     const qs = new URLSearchParams({
       limit: limit.toString(),
@@ -55,11 +63,13 @@ export function useItems({
       qs.set("price_max", priceRange[1].toString());
     }
 
+      qs.set("location", location);
+
     apiRequest(`/items?${qs.toString()}`)
       .then((data) => {
         setItems(data.items || []);
         setTotal(data.total || 0);
-        setFacets(data.facets || null);        // ✅ THIS WAS MISSING
+        setFacets(data.facets || null);
         setPriceBounds(data.priceBounds || null);
         setError("");
       })
@@ -75,6 +85,7 @@ export function useItems({
     priceRange?.[1],
     page,
     limit,
+    location,
   ]);
 
   return { items, total, facets, priceBounds, error };

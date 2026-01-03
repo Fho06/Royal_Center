@@ -16,7 +16,6 @@ type Props = {
   addToCart: (item: Item) => void;
   increaseQty: (itemId: string) => void;
   decreaseQty: (itemId: string) => void;
-  canIncrease: (itemId: string) => boolean;
   variant?: "featured" | "search";
   heroSize?: "large" | "small";
   showRemove?: boolean;
@@ -30,7 +29,6 @@ export function ProductTile({
   addToCart,
   increaseQty,
   decreaseQty,
-  canIncrease,
   variant = "featured",
   heroSize = "large",
   showRemove,
@@ -38,6 +36,7 @@ export function ProductTile({
 }: Props) {
   const qty = cartQty(item.id);
   const outOfStock = remainingStock(item) <= 0;
+  
 
   const [extIndex, setExtIndex] = useState(0);
   const [failed, setFailed] = useState(false);
@@ -158,8 +157,9 @@ export function ProductTile({
                   bg-[var(--navbar-accent)]
                   text-white font-bold
                 `}
-                onClick={() => increaseQty(item.id)}
-                disabled={!canIncrease(item.id)}
+                onClick={() => {if (remainingStock(item) <= 0) return;
+                increaseQty(item.id);}}
+                disabled={remainingStock(item) <= 0}
               >
                 +
               </button>
@@ -242,7 +242,7 @@ export function ProductTile({
 
             <button
               onClick={() => increaseQty(item.id)}
-              disabled={!canIncrease(item.id)}
+              disabled={remainingStock(item) <= 0}
               className="h-6 w-6 sm:h-7 sm:w-7 rounded-md text-white hover:bg-white/10 disabled:opacity-40 transition-colors"
             >
               +

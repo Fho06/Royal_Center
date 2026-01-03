@@ -2,7 +2,7 @@ export type Item = {
   id: string;
   name: string;
   price_usd: number;
-  stock: number;
+  available_stock: number;
   category_id: number;
 };
 

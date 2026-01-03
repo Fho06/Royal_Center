@@ -69,7 +69,7 @@ export default function PasscodeClient() {
     <div className="flex min-h-screen items-center justify-center">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-4 rounded border p-6"
+        className="w-full max-w-sm space-y-4 checkout-card p-6"
       >
         <h1 className="text-xl font-semibold">Set Passcode</h1>
 
@@ -81,7 +81,7 @@ export default function PasscodeClient() {
           pattern="\d{4}"
           maxLength={4}
           placeholder="4-digit passcode"
-          className="w-full rounded border p-2 text-center tracking-widest"
+          className="w-full inside-card p-2 text-center tracking-widest"
           value={passcode}
           onChange={(e) => setPasscode(e.target.value)}
           required
@@ -89,7 +89,7 @@ export default function PasscodeClient() {
 
         <button
           type="submit"
-          className="w-full rounded bg-black p-2 text-white"
+          className="w-full rounded-xl bg-[var(--reg-accent)] p-2 text-white font-bold "
         >
           Finish
         </button>
