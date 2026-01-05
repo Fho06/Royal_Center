@@ -28,9 +28,10 @@ export default function PasscodeClient() {
       return;
     }
 
+    
     const raw = sessionStorage.getItem("register_draft");
     if (!raw) {
-      setError("Registration session expired. Please register again.");
+      setError("La sesión de registro ha expirado. Regístrese de nuevo.");
       return;
     }
 
@@ -86,7 +87,7 @@ export default function PasscodeClient() {
           onChange={(e) => setPasscode(e.target.value)}
           required
         />
-
+ 
         <button
           type="submit"
           className="w-full rounded-xl bg-[var(--reg-accent)] p-2 text-white font-bold "

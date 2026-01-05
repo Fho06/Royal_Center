@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     is_default,
   } = await req.json();
 
-  if (!address_1 || !country || !state || !city || !municipio) {
+  if (!address_1 || !country || !state || !city) {
     return NextResponse.json(
       { error: "Missing required address fields" },
       { status: 400 }
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
       .input("country", sql.VarChar(100), country)
       .input("state", sql.VarChar(100), state)
       .input("city", sql.VarChar(100), city)
-      .input("municipio", sql.VarChar(100), municipio)
+      .input("municipio", sql.VarChar(100), municipio || null)
       .input("is_default", sql.Bit, is_default ? 1 : 0)
       .query(`
         INSERT INTO dbo.user_addresses (

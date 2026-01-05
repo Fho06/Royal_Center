@@ -7,13 +7,30 @@ import jwt from "jsonwebtoken";
    HELPERS
    ========================= */
 
+const VALID_RIF_PREFIX = new Set(["V", "E", "J", "G", "P"]);
+
+/** Accepts things like "V12345678", "v-12345678", "V 12345678" */
 function formatRIF(raw: string) {
   if (!raw) return null;
 
   const cleaned = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (cleaned.length < 9) return null;
+  // Must be 1 letter + 8 digits
+  if (!/^[A-Z]\d{8}$/.test(cleaned)) return null;
 
-  return raw
+  const prefix = cleaned[0];
+  if (!VALID_RIF_PREFIX.has(prefix)) return null;
+
+  return cleaned; // canonical form: "V12345678"
+}
+
+/** Try to infer which unique constraint failed (optional but helpful) */
+function guessDuplicateField(err: any) {
+  const msg = String(err?.message || "").toLowerCase();
+  // These checks depend on your SQL constraint/index names.
+  // If you have named constraints like UQ_users_phone / UQ_users_rif, match those.
+  if (msg.includes("phone")) return "phone";
+  if (msg.includes("rif")) return "rif";
+  return null;
 }
 
 /* =========================
@@ -33,20 +50,13 @@ const VALID_ACCOUNT_TYPES = [
 type AccountType = (typeof VALID_ACCOUNT_TYPES)[number];
 
 export async function POST(req: Request) {
-  /* =========================
-     ENV VALIDATION
-     ========================= */
   if (!process.env.JWT_SECRET) {
     console.error("❌ JWT_SECRET missing");
-    return NextResponse.json(
-      { error: "Server configuration error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 
   try {
     const body = await req.json();
-
     console.log("📥 Register payload:", body);
 
     const {
@@ -57,37 +67,27 @@ export async function POST(req: Request) {
       lastName,
       gender,
       companyName,
-      rif,
+      rif,          // should be like "V12345678" from frontend
       termsAccepted,
-      passcode, // 4 digits
+      passcode,     // 4 digits
     } = body;
 
     /* =========================
        BASIC VALIDATION
        ========================= */
-    if (!phone || !termsAccepted || !/^\d{4}$/.test(passcode)) {
-      console.error("❌ Missing basic fields");
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+    if (!phone || !termsAccepted || !/^\d{4}$/.test(String(passcode || ""))) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    // Optional: ensure phone is digits only (since you store "+58" + digits)
+    if (!/^\d{7,11}$/.test(String(phone))) {
+      return NextResponse.json({ error: "Invalid phone format" }, { status: 400 });
     }
 
     const normalizedAccountType = String(accountType).toLowerCase();
 
-    if (
-      !VALID_ACCOUNT_TYPES.includes(
-        normalizedAccountType as AccountType
-      )
-    ) {
-      console.error(
-        "❌ Invalid account type:",
-        normalizedAccountType
-      );
-      return NextResponse.json(
-        { error: "Invalid account type" },
-        { status: 400 }
-      );
+    if (!VALID_ACCOUNT_TYPES.includes(normalizedAccountType as AccountType)) {
+      return NextResponse.json({ error: "Invalid account type" }, { status: 400 });
     }
 
     const isJuridico = normalizedAccountType === "juridico";
@@ -95,11 +95,10 @@ export async function POST(req: Request) {
     /* =========================
        RIF (REQUIRED FOR ALL)
        ========================= */
-    const formattedRif = formatRIF(rif);
+    const formattedRif = formatRIF(String(rif || ""));
     if (!formattedRif) {
-      console.error("❌ Invalid RIF:", rif);
       return NextResponse.json(
-        { error: "Invalid RIF format" },
+        { error: "Invalid RIF format (must be letter + 8 digits, e.g. V12345678)" },
         { status: 400 }
       );
     }
@@ -109,78 +108,63 @@ export async function POST(req: Request) {
        ========================= */
     if (isJuridico) {
       if (!companyName) {
-        console.error("❌ Missing company name");
-        return NextResponse.json(
-          { error: "Company name is required" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "Company name is required" }, { status: 400 });
       }
     } else {
-      if (
-        !firstName ||
-        !lastName ||
-        !["femenino", "masculino"].includes(gender)
-      ) {
-        console.error("❌ Missing personal info", {
-          firstName,
-          lastName,
-          gender,
-        });
-        return NextResponse.json(
-          { error: "Información Personal Requerida" },
-          { status: 400 }
-        );
+      if (!firstName || !lastName || !["femenino", "masculino"].includes(gender)) {
+        return NextResponse.json({ error: "Información Personal Requerida" }, { status: 400 });
       }
     }
 
     const fullPhone = `+58${phone}`;
-    const passcodeHash = await bcrypt.hash(passcode, 10);
+    const passcodeHash = await bcrypt.hash(String(passcode), 10);
 
-    console.log("📝 Creating user:", {
-      phone: fullPhone,
-      accountType: normalizedAccountType,
-      rif: formattedRif,
-      isJuridico,
-    });
-
-    /* =========================
-       DB INSERT (TRANSACTION)
-       ========================= */
     const pool = await getPool();
     const tx = pool.transaction();
-
     await tx.begin();
 
     try {
+      /* =========================
+         OPTIONAL: pre-check duplicates
+         (gives cleaner errors than relying on 2627)
+         ========================= */
+      const dup = await tx
+        .request()
+        .input("phone", sql.VarChar(15), fullPhone)
+        .input("rif", sql.VarChar(20), formattedRif)
+        .query(`
+          SELECT
+            MAX(CASE WHEN phone = @phone THEN 1 ELSE 0 END) AS phone_exists,
+            MAX(CASE WHEN rif = @rif THEN 1 ELSE 0 END) AS rif_exists
+          FROM dbo.users
+          WHERE phone = @phone OR rif = @rif;
+        `);
+
+      const row = dup.recordset?.[0];
+      if (row?.phone_exists) {
+        await tx.rollback();
+        return NextResponse.json(
+          { error: "Phone already exists", field: "phone" },
+          { status: 409 }
+        );
+      }
+      if (row?.rif_exists) {
+        await tx.rollback();
+        return NextResponse.json(
+          { error: "RIF already exists", field: "rif" },
+          { status: 409 }
+        );
+      }
+
       const result = await tx
         .request()
         .input("phone", sql.VarChar(15), fullPhone)
         .input("email", sql.VarChar(255), email || null)
-        .input(
-          "account_type",
-          sql.VarChar(30),
-          normalizedAccountType
-        )
-        .input(
-          "first_name",
-          sql.VarChar(100),
-          isJuridico ? null : firstName
-        )
-        .input(
-          "last_name",
-          sql.VarChar(150),
-          isJuridico ? null : lastName
-        )
-        .input(
-          "gender",
-          sql.VarChar(10),
-          isJuridico ? null : gender
-        )
-        .input(
-          "company_name",
-          sql.VarChar(255),
-          isJuridico ? companyName : null
-        )
+        .input("account_type", sql.VarChar(30), normalizedAccountType)
+        .input("first_name", sql.VarChar(100), isJuridico ? null : firstName)
+        .input("last_name", sql.VarChar(150), isJuridico ? null : lastName)
+        .input("gender", sql.VarChar(10), isJuridico ? null : gender)
+        .input("company_name", sql.VarChar(255), isJuridico ? companyName : null)
         .input("rif", sql.VarChar(20), formattedRif)
         .input("passcode_hash", sql.VarChar(255), passcodeHash)
         .input("terms_accepted_at", sql.DateTime, new Date())
@@ -213,43 +197,34 @@ export async function POST(req: Request) {
             1,
             'user',
             @terms_accepted_at
-          )
+          );
         `);
 
       const user = result.recordset[0];
 
       const token = jwt.sign(
-        {
-          userId: user.user_id,
-          role: user.role,
-        },
+        { userId: user.user_id, role: user.role },
         process.env.JWT_SECRET,
         { expiresIn: "7d" }
       );
 
       await tx.commit();
-
-      console.log("✅ User created:", user.user_id);
-
       return NextResponse.json({ token });
     } catch (err) {
       await tx.rollback();
-      console.error("🔥 Transaction failed:", err);
       throw err;
     }
   } catch (err: any) {
+    // Unique constraint violation
     if (err?.number === 2627) {
-      console.error("⚠️ Duplicate account");
+      const field = guessDuplicateField(err);
       return NextResponse.json(
-        { error: "Account already exists" },
+        { error: "Account already exists", field },
         { status: 409 }
       );
     }
 
-    console.error("🔥 Register-complete error:", err);
-    return NextResponse.json(
-      { error: "Registration failed" },
-      { status: 500 }
-    );
+    console.error("🔥 Register error:", err);
+    return NextResponse.json({ error: "Registration failed" }, { status: 500 });
   }
 }
