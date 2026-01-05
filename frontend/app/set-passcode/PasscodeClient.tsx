@@ -10,59 +10,46 @@ export default function PasscodeClient() {
   const searchParams = useSearchParams();
   const { login } = useAuth();
 
-  const phone = searchParams.get("phone"); // WITHOUT +58
+  // phone WITHOUT +58 (backend will normalize)
+  const phone = searchParams.get("phone");
+
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
     if (!phone) {
-      setError("Missing phone number");
+      setError("Sesión inválida. Regístrese de nuevo.");
       return;
     }
 
     if (!/^\d{4}$/.test(passcode)) {
-      setError("Passcode must be 4 digits");
-      return;
-    }
-
-    
-    const raw = sessionStorage.getItem("register_draft");
-    if (!raw) {
-      setError("La sesión de registro ha expirado. Regístrese de nuevo.");
-      return;
-    }
-
-    const draft = JSON.parse(raw);
-
-    // Safety: prevent mismatched phones
-    if (draft.phone !== phone) {
-      setError("Phone mismatch. Please register again.");
+      setError("El código debe tener 4 dígitos");
       return;
     }
 
     try {
+      setLoading(true);
+
       const data = await apiRequest("/auth/register-complete", {
         method: "POST",
         body: JSON.stringify({
-          ...draft,
-          passcode,
+          phone,      // raw digits only
+          passcode,   // backend hashes
         }),
       });
 
       // ✅ AUTO LOGIN
       login(data.token);
 
-      sessionStorage.removeItem("register_draft");
-
-      const next = sessionStorage.getItem("register_next");
-      sessionStorage.removeItem("register_next");
-
-      router.push(next || "/account");
+      router.push("/account");
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "No se pudo completar el registro");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -72,27 +59,33 @@ export default function PasscodeClient() {
         onSubmit={handleSubmit}
         className="w-full max-w-sm space-y-4 checkout-card p-6"
       >
-        <h1 className="text-xl font-semibold">Set Passcode</h1>
+        <h1 className="text-xl font-semibold text-center">
+          Crear clave
+        </h1>
 
-        {error && <p className="text-red-600">{error}</p>}
+        {error && <p className="text-red-600 text-sm">{error}</p>}
 
         <input
           type="password"
           inputMode="numeric"
           pattern="\d{4}"
           maxLength={4}
-          placeholder="4-digit passcode"
-          className="w-full inside-card p-2 text-center tracking-widest"
+          placeholder="••••"
+          className="w-full inside-card p-3 text-center tracking-[0.4em]"
           value={passcode}
-          onChange={(e) => setPasscode(e.target.value)}
+          onChange={(e) =>
+            setPasscode(e.target.value.replace(/\D/g, ""))
+          }
           required
+          autoFocus
         />
- 
+
         <button
           type="submit"
-          className="w-full rounded-xl bg-[var(--reg-accent)] p-2 text-white font-bold "
+          disabled={loading}
+          className="w-full rounded-xl bg-[var(--reg-accent)] p-2 text-white font-bold disabled:opacity-60"
         >
-          Finish
+          {loading ? "Guardando..." : "Finalizar"}
         </button>
       </form>
     </div>
