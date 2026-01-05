@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AccountRegistering } from "./components/AccountRegistering";
+
 
 type AccountType =
   | "natural"
@@ -15,6 +17,17 @@ type AccountType =
 
 type Gender = "femenino" | "masculino";
 
+const RIF_PREFIX_BY_ACCOUNT: Record<AccountType, "" | "V" | "E" | "J" | "G"> = {
+  natural: "V",
+  extranjero: "E",
+  juridico: "J",
+  rif_persona_natural: "V",
+  rif_v: "V",
+  rif_e: "E",
+  gobierno: "G",
+  pasaporte: "", // ✅ no prefix
+};
+
 export default function RegisterClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,51 +37,133 @@ export default function RegisterClient() {
 
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [registering, setRegistering] = useState(false);
+
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [gender, setGender] = useState<Gender>("femenino");
 
   const [companyName, setCompanyName] = useState("");
-  const [rif, setRif] = useState("");
+  const [rifDigits, setRifDigits] = useState("");
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [rifError, setRifError] = useState("");
+
+
   const isJuridico = accountType === "juridico";
 
-  function handleContinue(e: React.FormEvent) {
+  const rifPrefix = RIF_PREFIX_BY_ACCOUNT[accountType];
+  const fullRif = rifPrefix ? `${rifPrefix}${rifDigits}` : rifDigits;
+
+
+  async function checkPhoneUnique(phone: string): Promise<boolean> {
+    const res = await fetch(
+      `/api/auth/check-phone?phone=${encodeURIComponent(phone)}`
+    );
+
+    if (!res.ok) {
+      // fail closed: block continuation
+      return false;
+    }
+
+    const data = await res.json();
+    return !data.exists; // true = OK to continue
+  }
+
+  async function checkRifUnique(rif: string): Promise<boolean> {
+    const res = await fetch(
+      `/api/auth/check-rif?rif=${encodeURIComponent(rif)}`
+    );
+
+    if (!res.ok) {
+      // fail closed: block continuation
+      return false;
+    }
+
+    const data = await res.json();
+
+    // backend may return { exists, invalid }
+    if (data.invalid) return false;
+
+    return !data.exists; // true = OK to continue
+  }
+
+  async function handleContinue(e: React.FormEvent) {
     e.preventDefault();
+    setRegistering(true);
+
+    // reset errors
+    setPhoneError("");
+    setRifError("");
     setError("");
 
-    if (!phone || !rif || !termsAccepted) {
-      setError("Missing required fields");
+    if (!phone) {
+      setPhoneError("Ingrese su número de teléfono");
+      setRegistering(false);
       return;
     }
 
-    if (!isJuridico) {
-      if (!firstName || !lastName) {
-        setError("Enter first and last name");
-        return;
-      }
+    if (!rifDigits) {
+      setRifError("Ingrese su identificación");
+      setRegistering(false);
+      return;
     }
 
-    if (isJuridico) {
-      if (!companyName) {
-        setError("Enter company name");
-        return;
-      }
+    if (!/^\d{8}$/.test(rifDigits)) {
+      setRifError("Debe contener exactamente 8 dígitos");
+      setRegistering(false);
+      return;
     }
 
+    if (!termsAccepted) {
+      setError("Debe aceptar los términos y condiciones");
+      setRegistering(false);
+      return;
+    }
 
+    if (!isJuridico && (!firstName || !lastName)) {
+      setError("Ingrese nombre y apellido");
+      setRegistering(false);
+      return;
+    }
+
+    if (isJuridico && !companyName) {
+      setError("Ingrese el nombre de la empresa");
+      setRegistering(false);
+      return;
+    }
+
+    // 🔴 BLOCK IF PHONE EXISTS
+    const phoneIsUnique = await checkPhoneUnique(phone);
+    if (!phoneIsUnique) {
+      setPhoneError(
+        "Este número ya está registrado. Intente iniciar sesión."
+      );
+      setRegistering(false);
+      return;
+    }
+
+    // 🔴 BLOCK IF RIF EXISTS
+    const rifIsUnique = await checkRifUnique(fullRif);
+    if (!rifIsUnique) {
+      setRifError("Esta identificación ya está registrada.");
+      setRegistering(false);
+      return;
+    }
+
+    // ✅ ALL CHECKS PASSED — CONTINUE
     const draft = {
-      phone, // without +58
+      phone,
       email,
       accountType,
       firstName,
       lastName,
       gender,
       companyName,
-      rif,
+      rif: fullRif,
       termsAccepted,
     };
 
@@ -84,6 +179,8 @@ export default function RegisterClient() {
       `/set-passcode?phone=${encodeURIComponent(phone)}`
     );
   }
+
+
 
   const nextParam = searchParams.get("next");
 
@@ -103,9 +200,11 @@ export default function RegisterClient() {
         <select
           className="inside-card w-full rounded p-2"
           value={accountType}
-          onChange={(e) =>
-            setAccountType(e.target.value as AccountType)
-          }
+         onChange={(e) => {
+            setAccountType(e.target.value as AccountType);
+            setRifDigits("");
+            setRifError("");
+          }}
         >
           <option value="natural">Natural</option>
           <option value="extranjero">Extranjero</option>
@@ -118,19 +217,31 @@ export default function RegisterClient() {
         </select>
 
         {/* PHONE */}
-        <div className="flex">
-          <span className="flex items-center rounded-l-md bg-[var(--reg-accent-soft)] -100 px-3 elevation-md">
-            +58
-          </span>
-          <input
-            type="tel"
-            className="w-full inside-card !rounded-r-md !rounded-l-none p-2"
-            placeholder="0123456789"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            required
-          />
+        <div>
+          <div className="flex">
+            <span className="flex items-center rounded-l-md bg-[var(--reg-accent-soft)] px-3 elevation-md">
+              +58
+            </span>
+            <input
+              type="tel"
+              className="w-full inside-card !rounded-r-md !rounded-l-none p-2"
+              placeholder="4121234567"
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value.replace(/\D/g, ""));
+                if (phoneError) setPhoneError("");
+              }}
+              required
+            />
+          </div>
+
+          {phoneError && (
+            <p className="text-red-600 text-xs mt-1">
+              {phoneError}
+            </p>
+          )}
         </div>
+
 
         {/* EMAIL */}
         <input
@@ -165,7 +276,9 @@ export default function RegisterClient() {
             <select
               className="w-full inside-card p-2"
               value={gender}
-              onChange={(e) => setGender(e.target.value as Gender)}
+              onChange={(e) =>
+                setGender(e.target.value as Gender)
+              }
             >
               <option value="masculino">Masculino</option>
               <option value="femenino">Femenino</option>
@@ -174,10 +287,10 @@ export default function RegisterClient() {
         )}
 
         {/* COMPANY NAME (JURIDICO ONLY) */}
-        {accountType === "juridico" && (
+        {isJuridico && (
           <input
             type="text"
-            placeholder="Company name"
+            placeholder="Nombre de la empresa"
             className="w-full inside-card p-2"
             value={companyName}
             onChange={(e) =>
@@ -187,19 +300,36 @@ export default function RegisterClient() {
           />
         )}
 
-        {/* RIF (ALWAYS REQUIRED) */}
-        <input
-          type="text"
-          placeholder={
-            accountType === "juridico"
-              ? "Company RIF (ej. J123456789)"
-              : "RIF (eg. V12345678)"
-          }
-          className="w-full inside-card p-2"
-          value={rif}
-          onChange={(e) => setRif(e.target.value)}
-          required
-        />
+        {/* RIF / PASSPORT */}
+        <div className="flex">
+          {rifPrefix && (
+            <span className="flex items-center rounded-l-md bg-[var(--reg-accent-soft)] px-3 elevation-md">
+              {rifPrefix}
+            </span>
+          )}
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={8}
+            className={`w-full inside-card p-2 ${
+              rifPrefix ? "!rounded-l-none" : ""
+            }`}
+            placeholder="12345678"
+            value={rifDigits}
+            onChange={(e) => {
+            setRifDigits(
+              e.target.value.replace(/\D/g, "").slice(0, 8)
+            );
+            if (rifError) setRifError("");
+          }}
+            required
+          />
+        </div>
+        {rifError && (
+            <p className="text-red-600 text-xs mt-1">
+              {rifError}
+            </p>
+          )}
 
         {/* TERMS */}
         <label className="flex items-center gap-2 text-sm">
@@ -216,10 +346,12 @@ export default function RegisterClient() {
 
         <button
           type="submit"
+          disabled={registering}
           className="w-full rounded-lg bg-[var(--reg-accent)] elevation-md p-2 text-white font-bold"
         >
           Continuar
         </button>
+        {registering && <AccountRegistering />}
 
         <p className="text-sm">
           ¿Ya tienes una cuenta?{" "}

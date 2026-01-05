@@ -28,7 +28,6 @@ const REQUIRED_FIELDS: (keyof AddressForm)[] = [
   "address_1",
   "state",
   "city",
-  "municipio"
 ];
 
 const emptyAddress: AddressForm = {
@@ -86,7 +85,7 @@ export function AddressModal({
           country: editing.country,
           state: editing.state,
           city: editing.city,
-          municipio: editing.municipio,
+          municipio: editing.municipio ?? "",
           is_default: editing.is_default,
         }
       : emptyAddress
