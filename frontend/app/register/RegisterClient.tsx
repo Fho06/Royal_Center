@@ -175,9 +175,43 @@ export default function RegisterClient() {
     const next = searchParams.get("next");
     if (next) sessionStorage.setItem("register_next", next);
 
+    // 1️⃣ CREATE USER (inactive)
+    const res = await fetch("/api/auth/register-start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        phone: `+58${phone}`,
+        email,
+        accountType,
+        firstName,
+        lastName,
+        gender,
+        companyName,
+        rif: fullRif,
+      }),
+    });
+
+    if (!res.ok) {
+      setError("No se pudo iniciar el registro");
+      setRegistering(false);
+      return;
+    }
+
+    // 2️⃣ SEND OTP
+    await fetch("/api/auth/send-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        phone: `+58${phone}`,
+      }),
+    });
+
+    // 3️⃣ GO TO VERIFY
     router.push(
-      `/set-passcode?phone=${encodeURIComponent(phone)}`
+      `/verify-otp?phone=${encodeURIComponent(phone)}`
     );
+
+
   }
 
 

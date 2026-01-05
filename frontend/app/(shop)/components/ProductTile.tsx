@@ -182,12 +182,12 @@ export function ProductTile({
     );
   }
 
-  /* SEARCH CARD (UNCHANGED) */
+  /* SEARCH CARD*/
   return (
     <div
       className="
         w-full rounded-xl border border-gray-200 bg-white
-        flex flex-col hover:shadow-sm transition-shadow
+        flex flex-col hover:shadow-xl transition-shadow
         sm:min-h-[460px]
       "
     >

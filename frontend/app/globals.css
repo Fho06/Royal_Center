@@ -305,7 +305,10 @@ label {
 }
 
 .reg-btn:hover {
-  filter: brightness(0.95);
+  filter: brightness(0.75);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.18),
+    0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
 /*CARDS IN CHECKOUT*/

@@ -201,7 +201,7 @@ export default function PagoMovilPage() {
 
             <div className="p-4 space-y-2.5 text-sm">
               <p>
-                <strong>Monto:</strong> Bs. {order.total_amount.toFixed(2)}
+                <strong>Monto: Bs. {order.total_amount.toFixed(2)}</strong>
               </p>
 
               {account && (
