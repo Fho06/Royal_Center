@@ -42,15 +42,43 @@ export async function GET(req: Request) {
     const result = await request.query(`
       SELECT
         o.id,
-        o.total_amount,
+        o.created_at,
         o.status,
         s.label AS status_label,
-        o.created_at,
-        u.email
+
+        o.total_amount,
+        o.subtotal,
+        o.tax_amount,
+        o.tip_amount,
+
+        o.fulfillment_type,
+        o.payment_method,
+        o.notes,
+
+        u.email,
+        u.phone,
+
+        ua.label        AS address_label,
+        ua.address_1,
+        ua.address_2,
+        ua.city,
+        ua.state,
+        ua.municipio,
+        ua.country
+
       FROM orders o
-      JOIN users u ON u.id = o.user_id
-      JOIN order_statuses s ON s.code = o.status
+      JOIN users u
+        ON u.user_id = o.user_id
+
+      JOIN order_statuses s
+        ON s.code = o.status
+
+      LEFT JOIN user_addresses ua
+        ON ua.address_id = o.address_id
+      AND ua.user_id = o.user_id
+
       ${whereClause}
+
       ORDER BY o.created_at DESC
     `);
 

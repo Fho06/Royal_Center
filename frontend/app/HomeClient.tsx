@@ -1,183 +1,76 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useCart } from "@/app/context/CartContext";
+import { useAuth } from "@/app/context/AuthContext";
 import { useItems } from "./(shop)/hooks/UseItems";
 import { ProductList } from "./(shop)/components/ProductList";
 import { Pagination } from "./(shop)/components/Pagination";
-import { useAuth } from "@/app/context/AuthContext";
 import {
   FeaturedGrid,
-  type FeaturedMap,
   type FeaturedSlot,
 } from "./(shop)/components/FeaturedGrid";
 import { AdminProductSearchModal } from "./(shop)/components/AdminProductSearchModal";
 import { SearchFilters } from "./(shop)/components/SearchFilters";
 import { LOCATION_MAP } from "@/lib/locationMap";
 
+import { useSearchPagination } from "./(shop)/hooks/UseSearchPagination";
+import { useFilters } from "./(shop)/hooks/UseFilters";
+import { useLoadingResultsEffect } from "./(shop)/hooks/UseLoadingResultsEffect";
+import { useFeatured } from "./(shop)/hooks/UseFeatured";
 
 const ITEMS_PER_PAGE = 20;
 
-function getToken() {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("token");
-}
-
-type ActivePick = {
-  slot: FeaturedSlot;
-  position: 1 | 2 | 3 | 4;
-} | null;
-
 export default function HomeClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
-  const {
-    cartQty,
-    remainingStock,
-    addToCart,
-    increaseQty,
-    decreaseQty,
-  } = useCart();
+  const { cartQty, remainingStock, addToCart, increaseQty, decreaseQty } =
+    useCart();
 
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => setHydrated(true), []);
-  const [isLoadingResults, setIsLoadingResults] = useState(false);
-
   /* =========================
      SEARCH / PAGINATION
      ========================= */
-  const [search, setSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const { hydrated, search, currentPage, setCurrentPage } =
+    useSearchPagination();
+
+  /* =========================
+     LOCATION (for FEATURED ONLY; useItems has its own location)
+     ========================= */
   const uiLocation = searchParams.get("location") ?? "29";
   const location = LOCATION_MAP[uiLocation] ?? "29";
 
+  /* =========================
+     LOADING OVERLAY (single state, same as original)
+     ========================= */
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
 
   /* =========================
-     DRAFT FILTERS (UI ONLY)
+     FILTERS (draft + applied)
      ========================= */
-  const [draftCategoryIds, setDraftCategoryIds] = useState<number[]>([]);
-  const [draftSubcategoryIds, setDraftSubcategoryIds] = useState<number[]>([]);
-  const [draftInStockOnly, setDraftInStockOnly] = useState(true);
-  const [draftPriceRange, setDraftPriceRange] =
-    useState<[number, number] | null>(null);
+  const filters = useFilters({
+    hydrated,
+    search,
+    setCurrentPage,
+    setIsLoadingResults,
+  });
 
   /* =========================
-     APPLIED FILTERS (USED FOR FETCH)
+     LOADING EFFECT (250ms) - SAME deps as original
      ========================= */
-  const [categoryIds, setCategoryIds] = useState<number[]>([]);
-  const [subcategoryIds, setSubcategoryIds] = useState<number[]>([]);
-  const [inStockOnly, setInStockOnly] = useState(true);
-  const [priceRange, setPriceRange] =
-    useState<[number, number] | null>(null);
-
-  /* =========================
-     URL → STATE (search/page only, like your current behavior)
-     ========================= */
-  useEffect(() => {
-    if (!hydrated) return;
-    setSearch(searchParams.get("search") || "");
-    setCurrentPage(Number(searchParams.get("page")) || 1);
-  }, [hydrated, searchParams]);
-
-  /* =========================
-     STATE → URL (search/page only, like your current behavior)
-     ========================= */
-  useEffect(() => {
-    if (!hydrated) return;
-
-    const url = new URL(window.location.href);
-
-    if (search) url.searchParams.set("search", search);
-    else url.searchParams.delete("search");
-
-    url.searchParams.set("page", String(currentPage));
-
-    router.replace(url.pathname + "?" + url.searchParams.toString(), {
-      scroll: false,
-    });
-  }, [hydrated, search, currentPage, router]);
-
-  /* =========================
-     RESET FILTERS ON NEW SEARCH
-     (resets BOTH draft + applied)
-     ========================= */
-  useEffect(() => {
-    if (!hydrated) return;
-
-    // draft
-    setDraftCategoryIds([]);
-    setDraftSubcategoryIds([]);
-    setDraftPriceRange(null);
-    setDraftInStockOnly(true);
-
-    // applied
-    setCategoryIds([]);
-    setSubcategoryIds([]);
-    setPriceRange(null);
-    setInStockOnly(true);
-
-    setCurrentPage(1);
-  }, [hydrated, search]);
-
-  useEffect(() => {
-  if (!hydrated) return;
-
-  setIsLoadingResults(true);
-
-  const t = setTimeout(() => {
-    setIsLoadingResults(false);
-    }, 250);
-
-    return () => clearTimeout(t);
-  }, [
+  useLoadingResultsEffect({
     hydrated,
     search,
     currentPage,
-    categoryIds,
-    subcategoryIds,
-    inStockOnly,
-    priceRange,
-  ]);
-
-
-  /* =========================
-     APPLY / CLEAR (ONLY TIME APPLIED STATE CHANGES)
-     ========================= */
-  function applyFilters() {
-    setIsLoadingResults(true);
-
-    setCategoryIds(draftCategoryIds);
-    setSubcategoryIds(draftSubcategoryIds);
-    setInStockOnly(draftInStockOnly);
-    setPriceRange(draftPriceRange);
-    setCurrentPage(1);
-
-    setTimeout(() => {
-      setIsLoadingResults(false);
-    }, 300);
-  }
-
-
-  function clearFilters() {
-    // draft
-    setDraftCategoryIds([]);
-    setDraftSubcategoryIds([]);
-    setDraftInStockOnly(true);
-    setDraftPriceRange(null);
-
-    // applied
-    setCategoryIds([]);
-    setSubcategoryIds([]);
-    setInStockOnly(true);
-    setPriceRange(null);
-
-    setCurrentPage(1);
-  }
+    categoryIds: filters.categoryIds,
+    subcategoryIds: filters.subcategoryIds,
+    inStockOnly: filters.inStockOnly,
+    priceRange: filters.priceRange,
+    setIsLoadingResults,
+  });
 
   /* =========================
      DATA (FACETS COME FROM SERVER)
@@ -185,10 +78,10 @@ export default function HomeClient() {
      ========================= */
   const { items, total, priceBounds, facets, error } = useItems({
     search,
-    categoryIds,
-    subcategoryIds,
-    inStockOnly,
-    priceRange,
+    categoryIds: filters.categoryIds,
+    subcategoryIds: filters.subcategoryIds,
+    inStockOnly: filters.inStockOnly,
+    priceRange: filters.priceRange,
     page: currentPage,
     limit: ITEMS_PER_PAGE,
   });
@@ -199,59 +92,7 @@ export default function HomeClient() {
   /* =========================
      FEATURED (UNCHANGED)
      ========================= */
-  const [featured, setFeatured] = useState<FeaturedMap>({});
-  const [modalOpen, setModalOpen] = useState(false);
-  const [activePick, setActivePick] = useState<ActivePick>(null);
-
-
-  async function loadFeatured() {
-    const res = await fetch(
-      `/api/featured?location=${encodeURIComponent(location)}&bust=${Date.now()}`,
-      { cache: "no-store" }
-    );
-
-    if (!res.ok) return;
-
-    const data = await res.json();
-    setFeatured(data.featured ?? {});
-  }
-
-  useEffect(() => {
-    if (!hydrated) return;
-    loadFeatured();
-  }, [hydrated,location]);
-
-  async function assignFeatured(
-    slot: FeaturedSlot,
-    position: number,
-    itemId: string
-  ) {
-    const token = getToken();
-    if (!token) return;
-
-    await fetch(`/api/featured/${slot}/${position}`, {
-      method: "PUT",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ item_id: itemId }),
-    });
-
-    await loadFeatured();
-  }
-
-  async function removeFeatured(slot: FeaturedSlot, position: number) {
-    const token = getToken();
-    if (!token) return;
-
-    await fetch(`/api/featured/${slot}/${position}`, {
-      method: "DELETE",
-      headers: { authorization: `Bearer ${token}` },
-    });
-
-    await loadFeatured();
-  }
+  const featuredCtrl = useFeatured({ hydrated, location });
 
   /* =========================
      RENDER
@@ -262,12 +103,15 @@ export default function HomeClient() {
         {!isSearching && (
           <FeaturedGrid
             isAdmin={isAdmin}
-            featured={featured}
+            featured={featuredCtrl.featured}
             onAddClick={(slot, position) => {
-              setActivePick({ slot, position });
-              setModalOpen(true);
+              featuredCtrl.setActivePick({
+                slot,
+                position,
+              } as { slot: FeaturedSlot; position: 1 | 2 | 3 | 4 });
+              featuredCtrl.setModalOpen(true);
             }}
-            onRemoveClick={removeFeatured}
+            onRemoveClick={featuredCtrl.removeFeatured}
             cartQty={cartQty}
             remainingStock={remainingStock}
             addToCart={addToCart}
@@ -282,17 +126,17 @@ export default function HomeClient() {
               facets={facets ?? null}
               priceBounds={priceBounds}
               // DRAFT goes to UI
-              priceRange={draftPriceRange}
-              setPriceRange={setDraftPriceRange}
-              categoryIds={draftCategoryIds}
-              setCategoryIds={setDraftCategoryIds}
-              subcategoryIds={draftSubcategoryIds}
-              setSubcategoryIds={setDraftSubcategoryIds}
-              inStockOnly={draftInStockOnly}
-              setInStockOnly={setDraftInStockOnly}
+              priceRange={filters.draftPriceRange}
+              setPriceRange={filters.setDraftPriceRange}
+              categoryIds={filters.draftCategoryIds}
+              setCategoryIds={filters.setDraftCategoryIds}
+              subcategoryIds={filters.draftSubcategoryIds}
+              setSubcategoryIds={filters.setDraftSubcategoryIds}
+              inStockOnly={filters.draftInStockOnly}
+              setInStockOnly={filters.setDraftInStockOnly}
               // ACTIONS
-              onApply={applyFilters}
-              onClear={clearFilters}
+              onApply={filters.applyFilters}
+              onClear={filters.clearFilters}
             />
 
             <div className="relative space-y-4">
@@ -304,6 +148,7 @@ export default function HomeClient() {
                   </div>
                 </div>
               )}
+
               <h2 className="pt-1 pb-7 text-2xl font-semibold">Resultados</h2>
 
               <ProductList
@@ -320,9 +165,7 @@ export default function HomeClient() {
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                onNext={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
+                onNext={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               />
 
               {error && <p className="text-red-600 text-sm">{error}</p>}
@@ -332,16 +175,20 @@ export default function HomeClient() {
 
         {isAdmin && (
           <AdminProductSearchModal
-            open={modalOpen}
+            open={featuredCtrl.modalOpen}
             onClose={() => {
-              setModalOpen(false);
-              setActivePick(null);
+              featuredCtrl.setModalOpen(false);
+              featuredCtrl.setActivePick(null);
             }}
             onPick={async (item) => {
-              if (!activePick) return;
-              setModalOpen(false);
-              await assignFeatured(activePick.slot, activePick.position, item.id);
-              setActivePick(null);
+              if (!featuredCtrl.activePick) return;
+              featuredCtrl.setModalOpen(false);
+              await featuredCtrl.assignFeatured(
+                featuredCtrl.activePick.slot,
+                featuredCtrl.activePick.position,
+                item.id
+              );
+              featuredCtrl.setActivePick(null);
             }}
           />
         )}

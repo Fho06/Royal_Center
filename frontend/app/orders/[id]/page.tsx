@@ -185,7 +185,7 @@ export default function OrderDetailsPage() {
       {/* TOTAL (UNCHANGED) */}
       <div className="border-t pt-4 text-right">
         <p className="text-lg font-bold">
-          Total: ${order.total_amount.toFixed(2)}
+          Total: Bs. {order.total_amount.toFixed(2)}
         </p>
       </div>
     </main>

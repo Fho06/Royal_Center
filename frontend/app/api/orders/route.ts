@@ -52,9 +52,11 @@ export async function GET(req: Request) {
         o.total_amount,
         o.status,
         s.label AS status_label,
-        o.created_at
+        o.created_at,
+        u.phone
       FROM orders o
       JOIN order_statuses s ON s.code = o.status
+      JOIN users u ON u.id = o.user_id
       ${whereClause}
       ORDER BY o.created_at DESC
     `);
@@ -192,11 +194,11 @@ const exchangeRate = Number(rateRes.recordset[0].rate_bs);
       }
 
       /* =========================================================
-         BUSINESS RULE
-         subtotal IS the final amount charged
-         ========================================================= */
-      const totalUsd = subtotal + Number(tip_amount || 0);
-      const totalBs = totalUsd * exchangeRate;
+        BUSINESS RULE
+        total_amount = subtotal * exchange_rate (BS)
+        ========================================================= */
+      const totalBs = subtotal * exchangeRate;
+
 
 
       /* ===============================

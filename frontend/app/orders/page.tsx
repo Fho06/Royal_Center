@@ -11,7 +11,9 @@ type Order = {
   status: string;
   status_label: string;
   created_at: string;
+  phone: string;
 };
+
 
 export default function OrdersPage() {
   const router = useRouter();

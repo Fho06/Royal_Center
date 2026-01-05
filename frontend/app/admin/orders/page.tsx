@@ -10,10 +10,28 @@ import { useRouter } from "next/navigation";
 type Order = {
   id: number;
   email: string;
-  total_amount: number;
+  phone: string;
+
   status: string;
   status_label: string;
   created_at: string;
+
+  total_amount: number;
+  subtotal: number;
+  tax_amount: number;
+  tip_amount: number;
+
+  fulfillment_type: "delivery" | "pickup";
+  payment_method: string;
+  notes: string | null;
+
+  address_label?: string;
+  address_1?: string;
+  address_2?: string;
+  city?: string;
+  state?: string;
+  municipio?: string;
+  country?: string;
 };
 
 const STATUSES = [
@@ -96,7 +114,7 @@ export default function AdminOrdersPage() {
   /* ---------- RENDER ---------- */
 
   return (
-    <main className="p-6 max-w-5xl mx-auto space-y-4">
+    <main className="checkout-cardp-6 max-w-4xl mx-auto space-y-4">
       <h1 className="text-2xl font-bold">
         Admin — Orders
       </h1>
@@ -118,11 +136,12 @@ export default function AdminOrdersPage() {
         {orders.map(o => (
           <div
             key={o.id}
-            className="border p-4 rounded space-y-1"
+            onClick={() => router.push(`/admin/orders/${o.id}`)}
+            className="checkout-card p-4 rounded space-y-1 hover:-translate-y-1 hover:shadow-xl"
           >
             <div className="flex justify-between">
               <p className="font-semibold">
-                Order #{o.id}
+                Orden #{o.id}
               </p>
               <p className="text-sm text-gray-500">
                 {new Date(o.created_at).toLocaleString()}
@@ -130,8 +149,8 @@ export default function AdminOrdersPage() {
             </div>
 
             <p>
-              <span className="font-medium">User:</span>{" "}
-              {o.email}
+              <span className="font-medium">Teléfono:</span>{" "}
+              {o.phone}
             </p>
 
             <p>
@@ -140,7 +159,7 @@ export default function AdminOrdersPage() {
             </p>
 
             <p className="font-bold">
-              Total: ${o.total_amount.toFixed(2)}
+              Total: Bs. {o.total_amount.toFixed(2)}
             </p>
 
             <div className="flex flex-wrap gap-2 mt-2">
@@ -148,7 +167,7 @@ export default function AdminOrdersPage() {
                 <button
                   key={s}
                   onClick={() => updateStatus(o.id, s)}
-                  className="border px-2 py-1 text-sm rounded hover:bg-gray-100"
+                  className="reg-btn px-2 py-1 text-sm rounded hover:bg-gray-100"
                 >
                   {s}
                 </button>
