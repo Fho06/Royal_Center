@@ -148,14 +148,25 @@ export async function POST(req: Request) {
         body: JSON.stringify({
           messages: [
             {
-              from: process.env.INFOBIP_SENDER || "TEST",
-              destinations: [{ to: normalizedPhone }],
+              from: process.env.INFOBIP_SENDER, // 🔴 MUST be the +44 number
+              destinations: [{ to: phone }],
               text: `Tu código de verificación es ${otp}. Expira en 5 minutos.`,
             },
           ],
         }),
       }
     );
+
+    const responseBody = await res.json();
+    console.log("📡 Infobip response:", responseBody);
+
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: "Failed to send OTP" },
+        { status: 502 }
+      );
+    }
+
 
     const responseText = await res.text();
 

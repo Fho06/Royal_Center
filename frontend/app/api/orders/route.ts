@@ -115,6 +115,23 @@ export async function POST(req: Request) {
     const tx = new sql.Transaction(pool);
     await tx.begin();
 
+    /* ===============================
+   GET LATEST EXCHANGE RATE (USD → BS)
+   =============================== */
+  const rateRes = await tx.request().query(`
+    SELECT TOP 1 rate_bs
+    FROM exchange_rates
+    WHERE currency = 'USD'
+    ORDER BY rate_date DESC, created_at DESC
+  `);
+
+  if (rateRes.recordset.length === 0) {
+    throw new Error("Exchange rate not available");
+  }
+
+const exchangeRate = Number(rateRes.recordset[0].rate_bs);
+
+
     try {
       let address: any = null;
 
@@ -178,7 +195,9 @@ export async function POST(req: Request) {
          BUSINESS RULE
          subtotal IS the final amount charged
          ========================================================= */
-      const totalAmount = subtotal + Number(tip_amount || 0);
+      const totalUsd = subtotal + Number(tip_amount || 0);
+      const totalBs = totalUsd * exchangeRate;
+
 
       /* ===============================
          CREATE ORDER
@@ -188,7 +207,7 @@ export async function POST(req: Request) {
         .input("user_id", sql.Int, user.userId)
         .input("subtotal", sql.Decimal(10, 2), subtotal)
         .input("tax", sql.Decimal(10, 2), taxAmount)
-        .input("total", sql.Decimal(10, 2), totalAmount)
+        .input("total", sql.Decimal(10, 2), totalBs)
         .input("address_id", sql.Int, address_id ?? null)
         .input("fulfillment_type", sql.VarChar, fulfillment_type)
         .input("tip_amount", sql.Decimal(10, 2), tip_amount)
