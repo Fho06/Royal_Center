@@ -39,10 +39,23 @@ const STATUSES = [
   "under_review",
   "order_placed",
   "picking_up",
-  "picked_up",
+  "en_route",
   "delivered",
+  "refunded",
   "cancelled",
 ];
+
+const STATUS_LABELS_ES: Record<string, string> = {
+  pending_payment: "Pago Pendiente",
+  under_review: "Bajo Revisión",
+  order_placed: "Orden Aceptada",
+  picking_up: "En Camino a la Tienda",
+  en_route: "En Camino",
+  delivered: "Entregado",
+  refunded: "Reembolsado",
+  cancelled: "Cancelado",
+};
+
 
 /* ---------- COMPONENT ---------- */
 
@@ -116,7 +129,7 @@ export default function AdminOrdersPage() {
   return (
     <main className="checkout-cardp-6 max-w-4xl mx-auto space-y-4">
       <h1 className="text-2xl font-bold">
-        Admin — Orders
+        Admin — Ordenes
       </h1>
 
       <select
@@ -124,7 +137,7 @@ export default function AdminOrdersPage() {
         onChange={e => setStatus(e.target.value)}
         className="border px-3 py-2"
       >
-        <option value="all">All</option>
+        <option value="all">Todos</option>
         {STATUSES.map(s => (
           <option key={s} value={s}>
             {s}
@@ -154,8 +167,8 @@ export default function AdminOrdersPage() {
             </p>
 
             <p>
-              <span className="font-medium">Status:</span>{" "}
-              {o.status_label}
+              <span className="font-medium">Estado:</span>{" "}
+              {STATUS_LABELS_ES[o.status_label] ?? o.status_label}
             </p>
 
             <p className="font-bold">
@@ -169,7 +182,7 @@ export default function AdminOrdersPage() {
                   onClick={() => updateStatus(o.id, s)}
                   className="reg-btn px-2 py-1 text-sm rounded hover:bg-gray-100"
                 >
-                  {s}
+                  {STATUS_LABELS_ES[s] ?? s}
                 </button>
               ))}
             </div>

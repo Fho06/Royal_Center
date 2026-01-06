@@ -36,26 +36,26 @@ export default function AdminOrderDetailPage() {
     <main className="p-6 max-w-4xl mx-auto space-y-6">
       <button
         onClick={() => router.back()}
-        className="text-sm text-gray-600 underline"
+        className="text-md text-gray-600 underline"
       >
-        ← Back to orders
+        ← Regresar a Ordenes
       </button>
 
       <h1 className="text-2xl font-bold">
-        Order #{order.id}
+        Orden #{order.id}
       </h1>
 
       <section className="space-y-1">
-        <p><b>User:</b> {order.email}</p>
-        <p><b>Phone:</b> {order.phone}</p>
-        <p><b>Status:</b> {order.status_label}</p>
-        <p><b>Payment:</b> {order.payment_method}</p>
-        <p><b>Fulfillment:</b> {order.fulfillment_type}</p>
+        <p><b>Número:</b> {order.phone}</p>
+        <p><b>Email:</b> {order.email}</p>
+        <p><b>Estado:</b> {order.status_label}</p>
+        <p><b>Método de Pago:</b> {order.payment_method}</p>
+        <p><b>Método de Entrega:</b> {order.fulfillment_type}</p>
       </section>
 
       {order.fulfillment_type === "delivery" && (
         <section className="space-y-1">
-          <h2 className="font-semibold">Delivery Address</h2>
+          <h2 className="font-semibold">DIRECCIÓN</h2>
           <p>{order.address_1}</p>
           {order.address_2 && <p>{order.address_2}</p>}
           <p>
@@ -65,10 +65,10 @@ export default function AdminOrderDetailPage() {
       )}
 
       <section>
-        <h2 className="font-semibold mb-2">Items</h2>
+        <h2 className="font-semibold mb-2">Artículos</h2>
         <div className="space-y-2">
           {items.map(i => (
-            <div key={i.item_id} className="border p-2 rounded">
+            <div key={i.item_id} className="border p-2 rounded">    
               <p>{i.name}</p>
               <p className="text-sm">
                 {i.quantity} × ${i.price.toFixed(2)}
