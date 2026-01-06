@@ -1,11 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { getPool, sql } from "@/lib/db";
 
 export async function POST(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
+
   const auth = req.headers.get("authorization");
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,7 +18,7 @@ export async function POST(
     process.env.JWT_SECRET!
   ) as { userId: number };
 
-  const orderId = Number(params.id);
+  const orderId = Number(id);
   if (!Number.isFinite(orderId)) {
     return NextResponse.json({ error: "Invalid order id" }, { status: 400 });
   }
@@ -77,7 +79,7 @@ export async function POST(
 
     await tx.commit();
     return NextResponse.json({ success: true });
-  } catch (err) {
+  } catch {
     await tx.rollback();
     return NextResponse.json(
       { error: "Failed to finalize order" },
