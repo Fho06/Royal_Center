@@ -144,37 +144,25 @@ export async function POST(req: Request) {
         headers: {
           Authorization: `App ${process.env.INFOBIP_API_KEY}`,
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify({
           messages: [
             {
-              from: process.env.INFOBIP_SENDER, // 🔴 MUST be the +44 number
-              destinations: [{ to: phone }],
+              from: process.env.INFOBIP_SENDER, // SMS sender
+              destinations: [{ to: normalizedPhone }],
               text: `Tu código de verificación es ${otp}. Expira en 5 minutos.`,
             },
           ],
         }),
       }
-    );
-
-    const responseBody = await res.json();
-    console.log("📡 Infobip response:", responseBody);
-
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: "Failed to send OTP" },
-        { status: 502 }
-      );
-    }
+    );  
 
 
-    const responseText = await res.text();
 
     console.log("📡 Infobip status:", res.status);
-    console.log("📡 Infobip response:", responseText);
 
     if (!res.ok) {
-      console.error("❌ Infobip error:", responseText);
       return NextResponse.json(
         { error: "Failed to send OTP" },
         { status: 502 }
