@@ -208,7 +208,7 @@ export default function RegisterClient() {
 
     // 3️⃣ GO TO VERIFY
     router.push(
-      `/verify-otp?phone=${encodeURIComponent(phone)}`
+      `/set-passcode?phone=${encodeURIComponent(phone)}`///cambiar
     );
 
 
