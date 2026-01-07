@@ -101,11 +101,11 @@ export async function POST(req: Request) {
           @company_name,
           @rif,
           SYSUTCDATETIME(),
-          0,
+          1, 
           NULL
         );
       `);
-
+//WHATSAPP
     const userId = result.recordset[0].user_id;
 
     return NextResponse.json({ userId });

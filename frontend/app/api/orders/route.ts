@@ -56,7 +56,7 @@ export async function GET(req: Request) {
         u.phone
       FROM orders o
       JOIN order_statuses s ON s.code = o.status
-      JOIN users u ON u.id = o.user_id
+      JOIN users u ON u.user_id = o.user_id
       ${whereClause}
       ORDER BY o.created_at DESC
     `);
@@ -120,21 +120,20 @@ export async function POST(req: Request) {
     /* ===============================
    GET LATEST EXCHANGE RATE (USD → BS)
    =============================== */
-  const rateRes = await tx.request().query(`
-    SELECT TOP 1 rate_bs
-    FROM exchange_rates
-    WHERE currency = 'USD'
-    ORDER BY rate_date DESC, created_at DESC
-  `);
-
-  if (rateRes.recordset.length === 0) {
-    throw new Error("Exchange rate not available");
-  }
-
-const exchangeRate = Number(rateRes.recordset[0].rate_bs);
 
 
     try {
+      const rateRes = await tx.request().query(`
+        SELECT TOP 1 rate_bs
+        FROM exchange_rates
+        WHERE currency = 'USD'
+        ORDER BY rate_date DESC, created_at DESC
+      `);
+
+      if (rateRes.recordset.length === 0) {
+        throw new Error("Exchange rate not available");
+      }
+      const exchangeRate = Number(rateRes.recordset[0].rate_bs);
       let address: any = null;
 
       /* ===============================
@@ -207,14 +206,14 @@ const exchangeRate = Number(rateRes.recordset[0].rate_bs);
       const orderRes = await tx
         .request()
         .input("user_id", sql.Int, user.userId)
-        .input("subtotal", sql.Decimal(10, 2), subtotal)
-        .input("tax", sql.Decimal(10, 2), taxAmount)
-        .input("total", sql.Decimal(10, 2), totalBs)
+        .input("subtotal", sql.Decimal(12, 2), subtotal)
+        .input("tax", sql.Decimal(12, 2), taxAmount)
+        .input("total", sql.Decimal(12, 2), totalBs)
         .input("address_id", sql.Int, address_id ?? null)
         .input("fulfillment_type", sql.VarChar, fulfillment_type)
-        .input("tip_amount", sql.Decimal(10, 2), tip_amount)
+        .input("tip_amount", sql.Decimal(12, 2), tip_amount)
         .input("payment_method", sql.VarChar, payment_method)
-        .input("notes", sql.NVarChar, notes)
+        .input("notes", sql.NVarChar(sql.MAX), notes)
         .query(`
           INSERT INTO orders (
             user_id,

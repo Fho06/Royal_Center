@@ -5,10 +5,14 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
 
-    const limit = Number(searchParams.get("limit")) || 20;
+    const MAX_LIMIT = 100;
+    const limit = Math.min(
+      Math.max(Number(searchParams.get("limit")) || 20, 1),
+      MAX_LIMIT
+    );
     const offset = Number(searchParams.get("offset")) || 0;
 
-    const FACET_PAGE_COUNT = 3;
+    const FACET_PAGE_COUNT = 2;
     const facetLimit = limit * FACET_PAGE_COUNT;
 
     const search = searchParams.get("search")?.trim() ?? "";
