@@ -128,14 +128,14 @@ export default function AdminOrdersPage() {
 
   return (
     <main className="checkout-cardp-6 max-w-4xl mx-auto space-y-4">
-      <h1 className="text-2xl font-bold">
+      <h1 className="text-3xl font-bold text-center">
         Admin — Ordenes
       </h1>
 
       <select
         value={status}
         onChange={e => setStatus(e.target.value)}
-        className="border px-3 py-2"
+        className="border px-3 py-2 cursor-pointer"
       >
         <option value="all">Todos</option>
         {STATUSES.map(s => (
@@ -145,12 +145,12 @@ export default function AdminOrdersPage() {
         ))}
       </select>
 
-      <div className="space-y-4">
+      <div className="space-y-4 cursor-pointer">
         {orders.map(o => (
           <div
             key={o.id}
             onClick={() => router.push(`/admin/orders/${o.id}`)}
-            className="checkout-card p-4 rounded space-y-1 hover:-translate-y-1 hover:shadow-xl"
+            className="checkout-card p-4 rounded space-y-1 hover:-translate-y-1 hover:shadow-xl cursor-pointer"
           >
             <div className="flex justify-between">
               <p className="font-semibold">

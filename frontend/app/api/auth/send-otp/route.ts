@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import twilio from "twilio";
 import { getPool, sql } from "@/lib/db";
+
+export const runtime = "nodejs";
 
 /* ===============================
    CONFIG
@@ -36,18 +39,19 @@ export async function POST(req: Request) {
       );
     }
 
-    // Normalize phone (SMS-only, Venezuela default)
+    // Normalize phone (Venezuela default)
     const normalizedPhone =
       phone.startsWith("+") ? phone : `+58${phone}`;
 
-    // Guard Infobip config
+    // Guard Twilio config
     if (
-      !process.env.INFOBIP_BASE_URL ||
-      !process.env.INFOBIP_API_KEY
+      !process.env.TWILIO_ACCOUNT_SID ||
+      !process.env.TWILIO_AUTH_TOKEN ||
+      !process.env.TWILIO_WHATSAPP_FROM
     ) {
-      console.error("❌ Infobip env vars missing");
+      console.error("❌ Twilio WhatsApp env vars missing");
       return NextResponse.json(
-        { error: "SMS service not configured" },
+        { error: "Messaging service not configured" },
         { status: 500 }
       );
     }
@@ -86,7 +90,7 @@ export async function POST(req: Request) {
     }
 
     /* --------------------------------
-       Simple resend cooldown
+       Resend cooldown
        -------------------------------- */
     if (
       user.otp_expires_at &&
@@ -107,7 +111,7 @@ export async function POST(req: Request) {
     const expiresAt = new Date(Date.now() + OTP_TTL_MS);
 
     /* --------------------------------
-       Store OTP on user row
+       Store OTP
        -------------------------------- */
     await pool
       .request()
@@ -123,48 +127,36 @@ export async function POST(req: Request) {
       `);
 
     /* --------------------------------
-       DEBUG LOGS (DEV ONLY)
+       Send WhatsApp OTP (PRODUCTION)
        -------------------------------- */
-    console.log("📲 send-otp called");
-    console.log("📞 Phone:", normalizedPhone);
+    const client = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
 
-    if (process.env.NODE_ENV !== "production") {
-      console.log("🔐 DEV OTP:", otp);
-    }
+    try {
+      const message = await client.messages.create({
+        from: process.env.TWILIO_WHATSAPP_FROM,
+        to: `whatsapp:${normalizedPhone}`,
 
-    console.log("⏱ OTP expires at:", expiresAt);
-
-    /* --------------------------------
-       Send SMS via Infobip
-       -------------------------------- */
-    const res = await fetch(
-      `${process.env.INFOBIP_BASE_URL}/sms/2/text/advanced`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `App ${process.env.INFOBIP_API_KEY}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              from: process.env.INFOBIP_SENDER, // SMS sender
-              destinations: [{ to: normalizedPhone }],
-              text: `Tu código de verificación es ${otp}. Expira en 5 minutos.`,
-            },
-          ],
+        // MUST match approved template
+        contentSid: process.env.TWILIO_OTP_TEMPLATE_SID,
+        contentVariables: JSON.stringify({
+          "1": otp,
+          "2": "5",
         }),
-      }
-    );  
+      });
 
+      console.log("📨 WhatsApp SID:", message.sid);
+    } catch (err: any) {
+      console.error(
+        "❌ WhatsApp PROD OTP failed:",
+        err.code,
+        err.message
+      );
 
-
-    console.log("📡 Infobip status:", res.status);
-
-    if (!res.ok) {
       return NextResponse.json(
-        { error: "Failed to send OTP" },
+        { error: "Failed to send WhatsApp OTP" },
         { status: 502 }
       );
     }

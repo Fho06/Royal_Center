@@ -54,7 +54,7 @@ export function ProductTile({
     const isSmall = heroSize === "small";
 
     const nameClass = isSmall
-      ? "text-xs font-semibold"
+      ? "text-[10px] font-semibold"
       : "text-sm font-semibold";
 
     const priceClass = isSmall ? "text-[11px]" : "text-sm";
@@ -167,12 +167,34 @@ export function ProductTile({
           )}
 
           {/* BOTTOM TEXT */}
-          <div className="absolute inset-x-0 bottom-0 p-3 text-white">
+          <div className="absolute inset-x-0 bottom-0 p-1 text-white">
             <div className="min-w-0">
-              <div className={`truncate ${nameClass}`}>
-                {item.name}
+              <div
+                className={`hero-marquee ${nameClass}`}
+                style={
+                  {
+                  } as React.CSSProperties
+                }
+              >
+                <div
+                  className="
+                    hero-marquee__inner
+                    [--hero-marquee-duration:7s]
+                    sm:[--hero-marquee-duration:7s]
+                    max-sm:[--hero-marquee-duration:11s]
+                  "
+                >
+                  {/* 1st copy */}
+                  <span className="hero-marquee__text">{item.name}</span>
+
+                  {/* 2nd copy (for seamless loop) */}
+                  <span className="hero-marquee__text" aria-hidden="true">
+                    {item.name}
+                  </span>
+                </div>
               </div>
-              <div className={`opacity-90 ${priceClass}`}>
+
+              <div className={`opacity-90 pl-1 ${priceClass}`}>
                 ${item.price_usd.toFixed(2)}
               </div>
             </div>

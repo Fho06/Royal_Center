@@ -146,6 +146,40 @@ label {
 }
 
 
+/* --- ProductTile hero name marquee --- */
+.hero-marquee {
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* the moving inner row */
+.hero-marquee__inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 2rem;              /* space between the two copies */
+  width: max-content;
+  will-change: transform;
+  animation: hero-marquee var(--hero-marquee-duration, 8s) linear infinite;
+}
+
+/* the text itself */
+.hero-marquee__text {
+  display: inline-block;
+}
+
+/* pause on hover (nice for desktop) */
+.group:hover .hero-marquee__inner {
+  animation-play-state: paused;
+}
+
+/* animation */
+@keyframes hero-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); } /* because we duplicate the text */
+}
+
+
 
 /* =========================
    NAVBAR — BASE THEME

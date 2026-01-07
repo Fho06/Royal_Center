@@ -25,17 +25,23 @@ export async function POST(req: Request) {
       );
     }
 
-    // 🔐 Normalize phone EXACTLY like send-otp
+    // Normalize phone
     const normalizedPhone =
       phone.startsWith("+") ? phone : `+58${phone}`;
 
+    // Normalize OTP
+    const cleanOtp = String(otp).replace(/\D/g, "");
+    if (cleanOtp.length !== 6) {
+      return NextResponse.json(
+        { error: "Código inválido" },
+        { status: 400 }
+      );
+    }
+
     const pool = await getPool();
-    const otpHash = hashOTP(String(otp));
+    const otpHash = hashOTP(cleanOtp);
     const now = new Date();
 
-    /* --------------------------------
-       Fetch user with OTP
-       -------------------------------- */
     const result = await pool
       .request()
       .input("phone", sql.VarChar(20), normalizedPhone)
@@ -72,9 +78,6 @@ export async function POST(req: Request) {
       );
     }
 
-    /* --------------------------------
-       Mark phone as verified
-       -------------------------------- */
     await pool
       .request()
       .input("phone", sql.VarChar(20), normalizedPhone)
