@@ -1,11 +1,18 @@
 require("dotenv").config();
 const sql = require("mssql");
 
+const path = require("path");
+require("dotenv").config({
+  path: path.resolve(__dirname, "../../.env"),
+});
+
+
 /* =========================
    CONFIG
    ========================= */
 const sourceConfig = {
   server: process.env.COMMON_SERVER,
+  
   port: Number(process.env.COMMON_PORT || 1433),
   user: process.env.ERP_DB_USER,
   password: process.env.ERP_DB_PASS,

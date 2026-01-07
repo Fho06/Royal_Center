@@ -1,4 +1,17 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+function getApiBaseUrl() {
+  // Client → relative
+  if (typeof window !== "undefined") {
+    return "";
+  }
+
+  // Server → absolute
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+
+  // Local dev fallback
+  return "http://localhost:3000";
+}
 
 export async function apiRequest(
   endpoint: string,
@@ -15,14 +28,15 @@ export async function apiRequest(
     ...(options.headers || {}),
   };
 
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const res = await fetch(
+    `${getApiBaseUrl()}/api${endpoint}`,
+    {
+      ...options,
+      headers,
+      cache: "no-store",
+    }
+  );
 
-  /* ============================================================
-     AUTH FAILURE HANDLING (401)
-     ============================================================ */
   if (res.status === 401) {
     if (typeof window !== "undefined") {
       const next = encodeURIComponent(window.location.pathname);
@@ -31,14 +45,10 @@ export async function apiRequest(
     throw new Error("Unauthorized");
   }
 
-  /* ============================================================
-     SAFE RESPONSE PARSING
-     - Supports JSON, empty bodies, 204 No Content
-     ============================================================ */
   let data: any = {};
-
   const contentType = res.headers.get("content-type");
-  if (contentType && contentType.includes("application/json")) {
+
+  if (contentType?.includes("application/json")) {
     try {
       data = await res.json();
     } catch {
@@ -47,7 +57,9 @@ export async function apiRequest(
   }
 
   if (!res.ok) {
-    throw new Error(data?.error || "API request failed");
+    throw new Error(
+      data?.error || `${res.status} ${res.statusText}`
+    );
   }
 
   return data;
