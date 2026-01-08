@@ -1,3 +1,4 @@
+// app/layout.tsx
 import "./globals.css";
 import { Suspense } from "react";
 import { CartProvider } from "@/app/context/CartContext";
@@ -10,7 +11,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="es">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "Perfumería Royal Center C.A.",
+              url: "https://royalcenterve.com",
+            }),
+          }}
+        />
+      </head>
+
       <body>
         <AuthProvider>
           <CartProvider>
