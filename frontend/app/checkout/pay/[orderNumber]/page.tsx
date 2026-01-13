@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import { useParams, useRouter } from "next/navigation";
 import { useCart } from "@/app/context/CartContext";
 
 type Order = {
-  id: number;
+  order_number: string;
   total_amount: number;
   status: string;
 };
@@ -31,19 +31,15 @@ const BANKS = [
 export default function PagoMovilPage() {
   const router = useRouter();
   const params = useParams();
+  const { setCart } = useCart();
 
-  const orderIdRef = useRef<string | null>(null);
-  if (orderIdRef.current === null) {
-    const raw = params.orderId;
-    orderIdRef.current =
-      typeof raw === "string"
-        ? raw
-        : Array.isArray(raw)
-        ? raw[0]
-        : null;
-  }
-
-  const orderId = orderIdRef.current;
+  // ✅ PARAM MUST MATCH FOLDER NAME: [orderNumber]
+  const orderNumber =
+    typeof params.orderNumber === "string"
+      ? params.orderNumber
+      : Array.isArray(params.orderNumber)
+      ? params.orderNumber[0]
+      : null;
 
   const [order, setOrder] = useState<Order | null>(null);
   const [accounts, setAccounts] = useState<PaymentAccount[]>([]);
@@ -54,8 +50,6 @@ export default function PagoMovilPage() {
   const [reference, setReference] = useState("");
   const [phoneLast4, setPhoneLast4] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const { setCart } = useCart();
-
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -63,7 +57,7 @@ export default function PagoMovilPage() {
       return;
     }
 
-    if (!orderId) {
+    if (!orderNumber) {
       setError("Orden inválida");
       setLoading(false);
       return;
@@ -72,7 +66,7 @@ export default function PagoMovilPage() {
     async function load() {
       try {
         const [orderRes, accountsRes] = await Promise.all([
-          apiRequest(`/orders/${orderId}`),
+          apiRequest(`/orders/${orderNumber}`),
           apiRequest(`/payment-accounts?method=pago_movil`),
         ]);
 
@@ -86,7 +80,7 @@ export default function PagoMovilPage() {
     }
 
     load();
-  }, [orderId, router]);
+  }, [orderNumber, router]);
 
   async function submitPayment() {
     if (!order) return;
@@ -103,16 +97,16 @@ export default function PagoMovilPage() {
       await apiRequest("/payments/pago-movil", {
         method: "POST",
         body: JSON.stringify({
-          order_id: order.id,
+          order_number: order.order_number,
           sender_bank: senderBank,
           reference_number: reference,
           amount: order.total_amount,
           phone_last4: phoneLast4 || undefined,
         }),
       });
-      setCart([]);
 
-      router.push(`/orders/${order.id}`);
+      setCart([]);
+      router.push(`/orders/${order.order_number}`);
     } catch (e: any) {
       setError(e.message || "Error enviando el pago");
     } finally {
@@ -136,10 +130,9 @@ export default function PagoMovilPage() {
           </div>
         )}
 
-        {/* CONTENT */}
         <div className="grid md:grid-cols-2 gap-6">
           {/* STEP 1 */}
-          <section className="bg-white rounded-xl elevation-xl overflow-hidden md:col-span-2">
+          <section className="bg-white rounded-xl elevation-xl md:col-span-2">
             <div className="bg-[var(--reg-accent-soft)] px-4 py-3 font-semibold flex gap-3 items-center">
               <span className="w-6 h-6 rounded-full bg-[var(--reg-accent)] text-white flex items-center justify-center text-sm font-bold">
                 1
@@ -165,7 +158,7 @@ export default function PagoMovilPage() {
                 placeholder="Referencia / N° de operación"
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
-                className="w-full border rounded px-3 py-1.5 text-sm"
+                className="w-full border rounded px-3 py-2"
               />
 
               <input
@@ -177,21 +170,8 @@ export default function PagoMovilPage() {
             </div>
           </section>
 
-          {/* WARNING — FULL WIDTH */}
-          <div className="md:col-span-2">
-            <div className="rounded-lg bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
-              <div className="flex items-start gap-3">
-                <span className="mt-0.5">⚠️</span>
-                <p className="leading-snug">
-                  Debes realizar el pago por el <strong>monto exacto</strong> o la
-                  orden no será procesada.
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* STEP 2 */}
-          <section className="bg-white rounded-xl elevation-xl overflow-hidden md:col-span-2">
+          <section className="bg-white rounded-xl elevation-xl md:col-span-2">
             <div className="bg-[var(--reg-accent-soft)] px-4 py-3 font-semibold flex gap-3 items-center">
               <span className="w-6 h-6 rounded-full bg-[var(--reg-accent)] text-white flex items-center justify-center text-sm font-bold">
                 2
@@ -206,20 +186,11 @@ export default function PagoMovilPage() {
 
               {account && (
                 <>
-                  <p>
-                    <strong>Banco:</strong> {account.bank_name}
-                  </p>
-                  <p>
-                    <strong>Teléfono:</strong> {account.phone}
-                  </p>
-                  <p>
-                    <strong>RIF:</strong> {account.rif}
-                  </p>
+                  <p><strong>Banco:</strong> {account.bank_name}</p>
+                  <p><strong>Teléfono:</strong> {account.phone}</p>
+                  <p><strong>RIF:</strong> {account.rif}</p>
                   {account.beneficiary_name && (
-                    <p>
-                      <strong>Beneficiario:</strong>{" "}
-                      {account.beneficiary_name}
-                    </p>
+                    <p><strong>Beneficiario:</strong> {account.beneficiary_name}</p>
                   )}
                 </>
               )}
@@ -227,7 +198,7 @@ export default function PagoMovilPage() {
               <button
                 disabled={submitting}
                 onClick={submitPayment}
-                className="mt-3 w-full reg-btn text-white py-1.5 rounded-lg font-bold disabled:opacity-50"
+                className="mt-3 w-full reg-btn text-white py-2 rounded-lg font-bold disabled:opacity-50"
               >
                 Ya realicé el pago
               </button>

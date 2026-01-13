@@ -109,7 +109,7 @@ export default function CheckoutPage() {
         }),
       });
 
-      router.push(`/checkout/pay/${res.orderId}`);
+      router.push(`/checkout/pay/${res.order_number}`);
     } catch (e: any) {
       setError(e.message || "Error al crear la orden");
     } finally {
@@ -180,46 +180,6 @@ export default function CheckoutPage() {
                 </select>
               </div>
             </AnimatedDropdown>
-
-
-
-
-            {/* PROPINA, AGREGAR DESPUES, DEFAULT = 0
-            <AnimatedDropdown
-              open={step === "review" && fulfillmentType === "delivery"}
-            >
-              <div className="checkout-card p-4 space-y-2">
-                <div className="font-semibold">Propina</div>
-                <div className="flex gap-2 flex-wrap">
-                  {TIP_PRESETS.map(v => (
-                    <button
-                      key={v}
-                      onClick={() => {
-                        setTip(v);
-                        setCustomTip("");
-                      }}
-                      className={`px-3 py-1 border rounded ${
-                        tip === v [#c5a5e9] text-white" : ""
-                      }`}
-                    >
-                      REF {v.toFixed(2)}
-                    </button>
-                  ))}
-                  <input
-                    type="number"
-                    placeholder="Otro"
-                    value={customTip}
-                    onChange={e => {
-                      setCustomTip(e.target.value);
-                      setTip(Number(e.target.value) || 0);
-                    }}
-                    className="border rounded px-2 w-24"
-                  />
-                </div>
-              </div>
-            </AnimatedDropdown>
-
-              */}
 
             <AnimatedDropdown open={step === "review"}>
               <div className="checkout-card p-4">

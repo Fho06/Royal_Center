@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPool, sql } from "@/lib/db";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 /* ---------- AUTH ---------- */
 function getUserFromRequest(req: Request) {
@@ -8,13 +9,27 @@ function getUserFromRequest(req: Request) {
   if (!auth) return null;
 
   try {
-    return jwt.verify(
-      auth.replace("Bearer ", ""),
-      process.env.JWT_SECRET!
-    ) as { userId: number };
+    return jwt.verify(auth.replace("Bearer ", ""), process.env.JWT_SECRET!) as {
+      userId: number;
+    };
   } catch {
     return null;
   }
+}
+
+/* ---------- ORDER NUMBER ---------- */
+/**
+ * Public order number format: RC-######## (8 digits)
+ * Example: RC-38492017
+ */
+function generateOrderNumber() {
+  const prefix = "RC";
+
+  const min = 10_000_000;
+  const max = 99_999_999;
+  const rand = crypto.randomInt(min, max + 1);
+
+  return `${prefix}-${rand}`;
 }
 
 /* ===============================
@@ -32,9 +47,7 @@ export async function GET(req: Request) {
     const status = searchParams.get("status");
 
     const pool = await getPool();
-    const request = pool
-      .request()
-      .input("user_id", sql.Int, user.userId);
+    const request = pool.request().input("user_id", sql.Int, user.userId);
 
     let whereClause = `
       WHERE o.user_id = @user_id
@@ -48,7 +61,7 @@ export async function GET(req: Request) {
 
     const result = await request.query(`
       SELECT
-        o.id,
+        o.order_number,
         o.total_amount,
         o.status,
         s.label AS status_label,
@@ -64,10 +77,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ orders: result.recordset });
   } catch (err) {
     console.error("Orders fetch error:", err);
-    return NextResponse.json(
-      { error: "Failed to fetch orders" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 });
   }
 }
 
@@ -92,17 +102,11 @@ export async function POST(req: Request) {
     } = await req.json();
 
     if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { error: "No items provided" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No items provided" }, { status: 400 });
     }
 
     if (!["delivery", "pickup"].includes(fulfillment_type)) {
-      return NextResponse.json(
-        { error: "Invalid fulfillment type" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid fulfillment type" }, { status: 400 });
     }
 
     if (fulfillment_type === "delivery" && !address_id) {
@@ -117,12 +121,10 @@ export async function POST(req: Request) {
     const tx = new sql.Transaction(pool);
     await tx.begin();
 
-    /* ===============================
-   GET LATEST EXCHANGE RATE (USD → BS)
-   =============================== */
-
-
     try {
+      /* ===============================
+         GET LATEST EXCHANGE RATE (USD → BS)
+         =============================== */
       const rateRes = await tx.request().query(`
         SELECT TOP 1 rate_bs
         FROM exchange_rates
@@ -133,6 +135,7 @@ export async function POST(req: Request) {
       if (rateRes.recordset.length === 0) {
         throw new Error("Exchange rate not available");
       }
+
       const exchangeRate = Number(rateRes.recordset[0].rate_bs);
       let address: any = null;
 
@@ -192,145 +195,168 @@ export async function POST(req: Request) {
         }
       }
 
-      /* =========================================================
-        BUSINESS RULE
-        total_amount = subtotal * exchange_rate (BS)
-        ========================================================= */
       const totalBs = subtotal * exchangeRate;
 
+      const MAX_TRIES = 5;
+      let orderNumber = "";
 
+      for (let i = 0; i < MAX_TRIES; i++) {
+        orderNumber = generateOrderNumber();
 
-      /* ===============================
-         CREATE ORDER
-         =============================== */
-      const orderRes = await tx
-        .request()
-        .input("user_id", sql.Int, user.userId)
-        .input("subtotal", sql.Decimal(12, 2), subtotal)
-        .input("tax", sql.Decimal(12, 2), taxAmount)
-        .input("total", sql.Decimal(12, 2), totalBs)
-        .input("address_id", sql.Int, address_id ?? null)
-        .input("fulfillment_type", sql.VarChar, fulfillment_type)
-        .input("tip_amount", sql.Decimal(12, 2), tip_amount)
-        .input("payment_method", sql.VarChar, payment_method)
-        .input("notes", sql.NVarChar(sql.MAX), notes)
-        .query(`
-          INSERT INTO orders (
-            user_id,
-            subtotal,
-            tax_amount,
-            total_amount,
-            address_id,
-            fulfillment_type,
-            tip_amount,
-            payment_method,
-            notes,
-            status
-          )
-          OUTPUT INSERTED.id
-          VALUES (
-            @user_id,
-            @subtotal,
-            @tax,
-            @total,
-            @address_id,
-            @fulfillment_type,
-            @tip_amount,
-            @payment_method,
-            @notes,
-            'pending_payment'
-          )
-        `);
-
-      const orderId = orderRes.recordset[0].id;
-
-      /* ===============================
-         SNAPSHOT ITEMS
-         =============================== */
-      for (const item of items) {
-        const itemRes = await tx
-          .request()
-          .input("id", sql.VarChar, item.item_id)
-          .query(`
-            SELECT price_usd, is_tax_exempt
-            FROM items
-            WHERE id = @id
-          `);
-
-        const dbItem = itemRes.recordset[0];
-
-        await tx
-          .request()
-          .input("order_id", sql.Int, orderId)
-          .input("item_id", sql.VarChar, item.item_id)
-          .input("quantity", sql.Int, item.quantity)
-          .input("price", sql.Decimal(10, 2), dbItem.price_usd)
-          .input("is_tax_exempt", sql.Bit, dbItem.is_tax_exempt)
-          .input("tax_rate", sql.Decimal(5, 4), 0)
-          .query(`
-            INSERT INTO order_items (
-              order_id,
-              item_id,
-              quantity,
-              price,
-              is_tax_exempt,
-              tax_rate
-            )
-            VALUES (
-              @order_id,
-              @item_id,
-              @quantity,
-              @price,
-              @is_tax_exempt,
-              @tax_rate
-            )
-          `);
-      }
-
-      /* ===============================
-         SNAPSHOT ADDRESS (DELIVERY ONLY, NON-BLOCKING)
-         =============================== */
-      if (address) {
         try {
-          await tx
+          /* ===============================
+             CREATE ORDER
+             =============================== */
+          const orderRes = await tx
             .request()
-            .input("order_id", sql.Int, orderId)
-            .input("label", sql.VarChar, address.label)
-            .input("address_1", sql.VarChar, address.address_1)
-            .input("address_2", sql.VarChar, address.address_2)
-            .input("country", sql.VarChar, address.country)
-            .input("state", sql.VarChar, address.state)
-            .input("city", sql.VarChar, address.city)
-            .input("municipio", sql.VarChar, address.municipio)
+            .input("user_id", sql.Int, user.userId)
+            .input("order_number", sql.VarChar(30), orderNumber)
+            .input("subtotal", sql.Decimal(12, 2), subtotal)
+            .input("tax", sql.Decimal(12, 2), taxAmount)
+            .input("total", sql.Decimal(12, 2), totalBs)
+            .input("address_id", sql.Int, address_id ?? null)
+            .input("fulfillment_type", sql.VarChar, fulfillment_type)
+            .input("tip_amount", sql.Decimal(12, 2), tip_amount)
+            .input("payment_method", sql.VarChar, payment_method)
+            .input("notes", sql.NVarChar(sql.MAX), notes)
             .query(`
-              INSERT INTO order_addresses (
-                order_id,
-                label,
-                address_1,
-                address_2,
-                country,
-                state,
-                city,
-                municipio
+              INSERT INTO orders (
+                user_id,
+                order_number,
+                subtotal,
+                tax_amount,
+                total_amount,
+                address_id,
+                fulfillment_type,
+                tip_amount,
+                payment_method,
+                notes,
+                status
               )
+              OUTPUT INSERTED.id
               VALUES (
-                @order_id,
-                @label,
-                @address_1,
-                @address_2,
-                @country,
-                @state,
-                @city,
-                @municipio
+                @user_id,
+                @order_number,
+                @subtotal,
+                @tax,
+                @total,
+                @address_id,
+                @fulfillment_type,
+                @tip_amount,
+                @payment_method,
+                @notes,
+                'pending_payment'
               )
             `);
-        } catch (e) {
-          console.warn("Order address snapshot failed:", e);
+
+          const orderId = orderRes.recordset[0].id;
+
+          /* ===============================
+             SNAPSHOT ITEMS
+             =============================== */
+          for (const item of items) {
+            const itemRes = await tx
+              .request()
+              .input("id", sql.VarChar, item.item_id)
+              .query(`
+                SELECT price_usd, is_tax_exempt
+                FROM items
+                WHERE id = @id
+              `);
+
+            const dbItem = itemRes.recordset[0];
+
+            await tx
+              .request()
+              .input("order_id", sql.Int, orderId)
+              .input("item_id", sql.VarChar, item.item_id)
+              .input("quantity", sql.Int, item.quantity)
+              .input("price", sql.Decimal(10, 2), dbItem.price_usd)
+              .input("is_tax_exempt", sql.Bit, dbItem.is_tax_exempt)
+              .input("tax_rate", sql.Decimal(5, 4), 0)
+              .query(`
+                INSERT INTO order_items (
+                  order_id,
+                  item_id,
+                  quantity,
+                  price,
+                  is_tax_exempt,
+                  tax_rate
+                )
+                VALUES (
+                  @order_id,
+                  @item_id,
+                  @quantity,
+                  @price,
+                  @is_tax_exempt,
+                  @tax_rate
+                )
+              `);
+          }
+
+          /* ===============================
+             SNAPSHOT ADDRESS (DELIVERY ONLY, NON-BLOCKING)
+             =============================== */
+          if (address) {
+            try {
+              await tx
+                .request()
+                .input("order_id", sql.Int, orderId)
+                .input("label", sql.VarChar, address.label)
+                .input("address_1", sql.VarChar, address.address_1)
+                .input("address_2", sql.VarChar, address.address_2)
+                .input("country", sql.VarChar, address.country)
+                .input("state", sql.VarChar, address.state)
+                .input("city", sql.VarChar, address.city)
+                .input("municipio", sql.VarChar, address.municipio)
+                .query(`
+                  INSERT INTO order_addresses (
+                    order_id,
+                    label,
+                    address_1,
+                    address_2,
+                    country,
+                    state,
+                    city,
+                    municipio
+                  )
+                  VALUES (
+                    @order_id,
+                    @label,
+                    @address_1,
+                    @address_2,
+                    @country,
+                    @state,
+                    @city,
+                    @municipio
+                  )
+                `);
+            } catch (e) {
+              console.warn("Order address snapshot failed:", e);
+            }
+          }
+
+          await tx.commit();
+
+          return NextResponse.json({
+            orderId,
+            order_number: orderNumber,
+          });
+        } catch (e: any) {
+          const msg = String(e?.message || "");
+          const num = Number(e?.number);
+          const isUniqueViolation =
+            num === 2601 ||
+            num === 2627 ||
+            msg.includes("UNIQUE") ||
+            msg.includes("duplicate");
+
+          if (!isUniqueViolation) throw e;
+          // else retry
         }
       }
 
-      await tx.commit();
-      return NextResponse.json({ orderId });
+      throw new Error("Failed to generate unique order number. Please retry.");
     } catch (err) {
       await tx.rollback();
       throw err;

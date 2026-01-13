@@ -6,14 +6,13 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/context/AuthContext";
 
 type Order = {
-  id: number;
+  order_number: string;
   total_amount: number;
   status: string;
   status_label: string;
   created_at: string;
   phone: string;
 };
-
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -25,7 +24,6 @@ export default function OrdersPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    // ⛔ wait for auth resolution
     if (authLoading) return;
 
     if (!isAuthenticated) {
@@ -86,11 +84,13 @@ export default function OrdersPage() {
       <div className="space-y-4">
         {orders.map((order) => (
           <div
-            key={order.id}
-            onClick={() => router.push(`/orders/${order.id}`)}
+            key={order.order_number}
+            onClick={() => router.push(`/orders/${order.order_number}`)}
             className="checkout-card p-4 cursor-pointer hover:bg-gray-50"
           >
-            <p className="font-semibold">Orden #{order.id}</p>
+            <p className="font-semibold">
+              Orden #{order.order_number}
+            </p>
             <p>Estado: {order.status_label}</p>
             <p>Total: ${order.total_amount.toFixed(2)}</p>
             <p className="text-sm text-gray-500">

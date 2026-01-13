@@ -4,15 +4,14 @@ import { requireAdmin } from "@/lib/admin";
 
 export async function PATCH(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ orderNumber: string }> }
 ) {
   try {
     requireAdmin(req);
 
-    const { id } = await params;
-    const orderId = Number(id);
+    const { orderNumber } = await params;
 
-    if (!Number.isFinite(orderId)) {
+    if (!orderNumber) {
       return NextResponse.json(
         { error: "Invalid order id" },
         { status: 400 }
@@ -37,11 +36,11 @@ export async function PATCH(
       /* ---------- FETCH CURRENT STATUS ---------- */
       const currentRes = await tx
         .request()
-        .input("id", sql.Int, orderId)
+        .input("order_number", sql.VarChar, orderNumber)
         .query(`
           SELECT status
           FROM orders
-          WHERE id = @id
+          WHERE order_number = @order_number
         `);
 
       if (currentRes.recordset.length === 0) {
@@ -95,13 +94,15 @@ export async function PATCH(
       ) {
         const stockCheck = await tx
           .request()
-          .input("order_id", sql.Int, orderId)
+          .input("order_number", sql.VarChar, orderNumber)
           .query(`
             SELECT i.id
             FROM items i
             JOIN order_items oi ON oi.item_id = i.id
-            WHERE oi.order_id = @order_id
-              AND i.stock < oi.quantity
+            WHERE oi.order_id = (
+              SELECT id FROM orders WHERE order_number = @order_number
+            )
+            AND i.stock < oi.quantity
           `);
 
         if (stockCheck.recordset.length > 0) {
@@ -110,13 +111,15 @@ export async function PATCH(
 
         await tx
           .request()
-          .input("order_id", sql.Int, orderId)
+          .input("order_number", sql.VarChar, orderNumber)
           .query(`
             UPDATE i
             SET i.stock = i.stock - oi.quantity
             FROM items i
             JOIN order_items oi ON oi.item_id = i.id
-            WHERE oi.order_id = @order_id
+            WHERE oi.order_id = (
+              SELECT id FROM orders WHERE order_number = @order_number
+            )
           `);
       }
 
@@ -126,25 +129,27 @@ export async function PATCH(
       ) {
         await tx
           .request()
-          .input("order_id", sql.Int, orderId)
+          .input("order_number", sql.VarChar, orderNumber)
           .query(`
             UPDATE i
             SET i.stock = i.stock + oi.quantity
             FROM items i
             JOIN order_items oi ON oi.item_id = i.id
-            WHERE oi.order_id = @order_id
+            WHERE oi.order_id = (
+              SELECT id FROM orders WHERE order_number = @order_number
+            )
           `);
       }
 
       /* ---------- UPDATE STATUS ---------- */
       await tx
         .request()
-        .input("id", sql.Int, orderId)
+        .input("order_number", sql.VarChar, orderNumber)
         .input("status", sql.VarChar, newStatus)
         .query(`
           UPDATE orders
           SET status = @status
-          WHERE id = @id
+          WHERE order_number = @order_number
         `);
 
       await tx.commit();

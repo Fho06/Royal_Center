@@ -8,7 +8,8 @@ import { useRouter } from "next/navigation";
 /* ---------- TYPES ---------- */
 
 type Order = {
-  id: number;
+  order_number: string;
+
   email: string;
   phone: string;
 
@@ -34,6 +35,8 @@ type Order = {
   country?: string;
 };
 
+/* ---------- CONSTANTS ---------- */
+
 const STATUSES = [
   "pending_payment",
   "under_review",
@@ -56,7 +59,6 @@ const STATUS_LABELS_ES: Record<string, string> = {
   cancelled: "Cancelado",
 };
 
-
 /* ---------- COMPONENT ---------- */
 
 export default function AdminOrdersPage() {
@@ -68,6 +70,8 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  /* ---------- DATA ---------- */
+
   async function load() {
     setLoading(true);
     setError("");
@@ -76,10 +80,7 @@ export default function AdminOrdersPage() {
       const params = new URLSearchParams();
       if (status !== "all") params.set("status", status);
 
-      const data = await apiRequest(
-        `/admin/orders?${params.toString()}`
-      );
-
+      const data = await apiRequest(`/admin/orders?${params.toString()}`);
       setOrders(Array.isArray(data.orders) ? data.orders : []);
     } catch (err: any) {
       setError(err.message || "Failed to load admin orders");
@@ -89,9 +90,9 @@ export default function AdminOrdersPage() {
     }
   }
 
-  async function updateStatus(orderId: number, newStatus: string) {
+  async function updateStatus(orderNumber: string, newStatus: string) {
     try {
-      await apiRequest(`/admin/orders/${orderId}/status`, {
+      await apiRequest(`/admin/orders/${orderNumber}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status: newStatus }),
       });
@@ -127,9 +128,10 @@ export default function AdminOrdersPage() {
   /* ---------- RENDER ---------- */
 
   return (
-    <main className="checkout-cardp-6 max-w-4xl mx-auto space-y-4">
+    <main className="p-6 max-w-4xl mx-auto space-y-4">
+      
       <h1 className="text-3xl font-bold text-center">
-        Admin — Ordenes
+        Admin — Órdenes
       </h1>
 
       <select
@@ -140,21 +142,23 @@ export default function AdminOrdersPage() {
         <option value="all">Todos</option>
         {STATUSES.map(s => (
           <option key={s} value={s}>
-            {s}
+            {STATUS_LABELS_ES[s] ?? s}
           </option>
         ))}
       </select>
 
-      <div className="space-y-4 cursor-pointer">
+      <div className="space-y-4">
         {orders.map(o => (
           <div
-            key={o.id}
-            onClick={() => router.push(`/admin/orders/${o.id}`)}
+            key={o.order_number}
+            onClick={() =>
+              router.push(`/admin/orders/${o.order_number}`)
+            }
             className="checkout-card p-4 rounded space-y-1 hover:-translate-y-1 hover:shadow-xl cursor-pointer"
           >
             <div className="flex justify-between">
               <p className="font-semibold">
-                Orden #{o.id}
+                Orden #{o.order_number}
               </p>
               <p className="text-sm text-gray-500">
                 {new Date(o.created_at).toLocaleString()}
@@ -168,7 +172,7 @@ export default function AdminOrdersPage() {
 
             <p>
               <span className="font-medium">Estado:</span>{" "}
-              {STATUS_LABELS_ES[o.status_label] ?? o.status_label}
+              {STATUS_LABELS_ES[o.status] ?? o.status}
             </p>
 
             <p className="font-bold">
@@ -178,8 +182,11 @@ export default function AdminOrdersPage() {
             <div className="flex flex-wrap gap-2 mt-2">
               {STATUSES.map(s => (
                 <button
-                  key={s}
-                  onClick={() => updateStatus(o.id, s)}
+                  key={`${o.order_number}-${s}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateStatus(o.order_number, s);
+                  }}
                   className="reg-btn px-2 py-1 text-sm rounded hover:bg-gray-100"
                 >
                   {STATUS_LABELS_ES[s] ?? s}

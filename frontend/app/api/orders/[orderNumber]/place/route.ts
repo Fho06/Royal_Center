@@ -13,27 +13,24 @@ function getUser(req: Request) {
     return jwt.verify(
       auth.replace("Bearer ", ""),
       process.env.JWT_SECRET!
-    ) as {
-      userId: number;
-    };
+    ) as { userId: number };
   } catch {
     return null;
   }
 }
 
 /* ===============================
-   POST /api/orders/[id]/place
+   POST /api/orders/[orderNumber]/place
    =============================== */
 export async function POST(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ orderNumber: string }> }
 ) {
-  const { id } = await params;
-  const orderId = Number(id);
+  const { orderNumber } = await params;
 
-  if (Number.isNaN(orderId)) {
+  if (!orderNumber) {
     return NextResponse.json(
-      { error: "Invalid order id" },
+      { error: "Invalid order number" },
       { status: 400 }
     );
   }
@@ -48,6 +45,24 @@ export async function POST(
   await tx.begin();
 
   try {
+    /* ---------- RESOLVE ORDER (OWNERSHIP CHECK) ---------- */
+    const orderRes = await tx
+      .request()
+      .input("order_number", sql.VarChar, orderNumber)
+      .input("user_id", sql.Int, user.userId)
+      .query(`
+        SELECT id
+        FROM orders
+        WHERE order_number = @order_number
+          AND user_id = @user_id
+      `);
+
+    if (orderRes.recordset.length === 0) {
+      throw new Error("Order not found");
+    }
+
+    const orderId = orderRes.recordset[0].id;
+
     /* ---------- LOAD ORDER ITEMS ---------- */
     const itemsRes = await tx
       .request()

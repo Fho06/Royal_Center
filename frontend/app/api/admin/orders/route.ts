@@ -5,28 +5,41 @@ import jwt from "jsonwebtoken";
 /* ---------- ADMIN AUTH ---------- */
 function requireAdmin(req: Request) {
   const auth = req.headers.get("authorization");
-  if (!auth) throw new Error("Unauthorized");
-
-  const token = auth.replace("Bearer ", "");
-  const user = jwt.verify(token, process.env.JWT_SECRET!) as {
-    userId: number;
-    role?: string;
-  };
-
-  if (user.role !== "admin") {
-    throw new Error("Forbidden");
+  if (!auth) {
+    return { error: "Unauthorized", status: 401 } as const;
   }
 
-  return user;
+  try {
+    const token = auth.replace("Bearer ", "");
+    const user = jwt.verify(token, process.env.JWT_SECRET!) as {
+      userId: number;
+      role?: string;
+    };
+
+    if (user.role !== "admin") {
+      return { error: "Forbidden", status: 403 } as const;
+    }
+
+    return { user } as const;
+  } catch {
+    return { error: "Unauthorized", status: 401 } as const;
+  }
 }
 
 /* ===============================
    GET /api/admin/orders
    =============================== */
 export async function GET(req: Request) {
-  try {
-    requireAdmin(req);
+  /* ---------- AUTH ---------- */
+  const authResult = requireAdmin(req);
+  if ("error" in authResult) {
+    return NextResponse.json(
+      { error: authResult.error },
+      { status: authResult.status }
+    );
+  }
 
+  try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
 
@@ -41,7 +54,7 @@ export async function GET(req: Request) {
 
     const result = await request.query(`
       SELECT
-        o.id,
+        o.order_number,
         o.created_at,
         o.status,
         s.label AS status_label,
@@ -75,7 +88,7 @@ export async function GET(req: Request) {
 
       LEFT JOIN user_addresses ua
         ON ua.address_id = o.address_id
-      AND ua.user_id = o.user_id
+       AND ua.user_id = o.user_id
 
       ${whereClause}
 
@@ -83,19 +96,11 @@ export async function GET(req: Request) {
     `);
 
     return NextResponse.json({ orders: result.recordset });
-  } catch (err: any) {
-    const msg = err.message || "Failed to fetch admin orders";
-
+  } catch (err) {
+    console.error("Admin orders fetch error:", err);
     return NextResponse.json(
-      { error: msg },
-      {
-        status:
-          msg === "Unauthorized"
-            ? 401
-            : msg === "Forbidden"
-            ? 403
-            : 500,
-      }
+      { error: "Failed to fetch admin orders" },
+      { status: 500 }
     );
   }
 }
