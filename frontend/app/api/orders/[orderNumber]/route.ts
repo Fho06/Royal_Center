@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ orderNumber: string }> }
 ) {
   try {
     /* ---------- AUTH ---------- */
@@ -21,13 +21,12 @@ export async function GET(
       userId: number;
     };
 
-    /* ---------- PARAM ---------- */
-    const { id } = await params;
-    const orderId = Number(id);
+    /* ---------- PARAM (Next 16 FIX) ---------- */
+    const { orderNumber } = await params;
 
-    if (!Number.isFinite(orderId)) {
+    if (!orderNumber) {
       return NextResponse.json(
-        { error: "Invalid order id" },
+        { error: "Invalid order number" },
         { status: 400 }
       );
     }
@@ -35,14 +34,14 @@ export async function GET(
     /* ---------- DB ---------- */
     const pool = await getPool();
 
-    /* ---------- ORDER ---------- */
+    /* ---------- ORDER (OWNERSHIP) ---------- */
     const orderRes = await pool
       .request()
-      .input("id", sql.Int, orderId)
+      .input("order_number", sql.VarChar, orderNumber)
       .input("user_id", sql.Int, user.userId)
       .query(`
         SELECT
-          o.id,
+          o.order_number,
           o.total_amount,
           o.status,
           s.label AS status_label,
@@ -50,7 +49,7 @@ export async function GET(
         FROM orders o
         JOIN order_statuses s
           ON s.code = o.status
-        WHERE o.id = @id
+        WHERE o.order_number = @order_number
           AND o.user_id = @user_id
       `);
 
@@ -64,7 +63,7 @@ export async function GET(
     /* ---------- ITEMS ---------- */
     const itemsRes = await pool
       .request()
-      .input("order_id", sql.Int, orderId)
+      .input("order_number", sql.VarChar, orderNumber)
       .query(`
         SELECT
           i.name,
@@ -73,7 +72,9 @@ export async function GET(
         FROM order_items oi
         JOIN items i
           ON i.id = oi.item_id
-        WHERE oi.order_id = @order_id
+        JOIN orders o
+          ON o.id = oi.order_id
+        WHERE o.order_number = @order_number
       `);
 
     return NextResponse.json({

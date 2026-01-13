@@ -6,14 +6,10 @@ import { apiRequest } from "@/lib/api";
 import { useAuth } from "@/app/context/AuthContext";
 import { useParams, useRouter } from "next/navigation";
 
-/* ---------- IMAGE HELPERS (SAME AS ProductTile) ---------- */
-
 const IMAGE_BASE_URL =
   "https://pub-db262da1ef9140738af0ec8adade1c90.r2.dev/products";
 
 const IMAGE_EXTENSIONS = ["jpeg", "jpg", "webp", "png", "jfif", "heic"];
-
-/* ---------- TYPES ---------- */
 
 type OrderItem = {
   item_id: string;
@@ -23,14 +19,12 @@ type OrderItem = {
 };
 
 type Order = {
-  id: number;
+  order_number: string;
   total_amount: number;
   status: string;
   status_label: string;
   created_at: string;
 };
-
-/* ---------- READ-ONLY ROW (CHECKOUT STYLE) ---------- */
 
 function OrderItemRow({ item }: { item: OrderItem }) {
   const [extIndex, setExtIndex] = useState(0);
@@ -50,7 +44,6 @@ function OrderItemRow({ item }: { item: OrderItem }) {
 
   return (
     <div className="flex gap-4 p-4 items-start">
-      {/* IMAGE */}
       <div className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border">
         <Image
           src={src}
@@ -62,18 +55,15 @@ function OrderItemRow({ item }: { item: OrderItem }) {
         />
       </div>
 
-      {/* INFO */}
       <div className="flex-1 min-w-0">
         <p className="font-medium leading-tight truncate">
           {item.name}
         </p>
-
         <p className="text-sm text-gray-500 mt-1">
           Qty: {item.quantity}
         </p>
       </div>
 
-      {/* TOTAL */}
       <div className="text-right shrink-0">
         <p className="font-semibold">
           ${(item.price * item.quantity).toFixed(2)}
@@ -86,26 +76,18 @@ function OrderItemRow({ item }: { item: OrderItem }) {
   );
 }
 
-/* ---------- COMPONENT ---------- */
-
 export default function OrderDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const { loading: authLoading, isAuthenticated } = useAuth();
 
-  const orderId =
-    typeof params.id === "string"
-      ? params.id
-      : Array.isArray(params.id)
-      ? params.id[0]
-      : null;
+  // ✅ FIX: unified param name
+  const orderNumber = params.orderNumber as string;
 
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  /* ---------- AUTH + FETCH ---------- */
 
   useEffect(() => {
     if (authLoading) return;
@@ -115,15 +97,15 @@ export default function OrderDetailsPage() {
       return;
     }
 
-    if (!orderId) {
-      setError("Invalid order ID");
+    if (!orderNumber) {
+      setError("Invalid order number");
       setLoading(false);
       return;
     }
 
     async function load() {
       try {
-        const data = await apiRequest(`/orders/${orderId}`);
+        const data = await apiRequest(`/orders/${orderNumber}`);
         setOrder(data.order);
         setItems(data.items);
       } catch (err: any) {
@@ -134,9 +116,7 @@ export default function OrderDetailsPage() {
     }
 
     load();
-  }, [authLoading, isAuthenticated, orderId, router]);
-
-  /* ---------- STATES ---------- */
+  }, [authLoading, isAuthenticated, orderNumber, router]);
 
   if (authLoading || loading) {
     return <div className="p-6">Loading order…</div>;
@@ -150,14 +130,11 @@ export default function OrderDetailsPage() {
     return <div className="p-6">Order not found.</div>;
   }
 
-  /* ---------- RENDER ---------- */
-
   return (
     <main className="p-6 max-w-3xl mx-auto space-y-6 mt-3">
-      {/* HEADER (UNCHANGED) */}
       <div>
         <h1 className="text-2xl font-bold">
-          Order #{order.id}
+          Order #{order.order_number}
         </h1>
 
         <p className="text-sm text-gray-500">
@@ -172,17 +149,15 @@ export default function OrderDetailsPage() {
         </p>
       </div>
 
-      {/* PRODUCT LIST — ONLY PART THAT CHANGED */}
       <div className="checkout-card overflow-hidden divide-y divide-gray-100">
         {items.map((item, index) => (
           <OrderItemRow
-            key={`${order.id}-${item.item_id ?? "item"}-${index}`}
+            key={`${order.order_number}-${item.item_id}-${index}`}
             item={item}
           />
         ))}
       </div>
 
-      {/* TOTAL (UNCHANGED) */}
       <div className="border-t pt-4 text-right">
         <p className="text-lg font-bold">
           Total: Bs. {order.total_amount.toFixed(2)}

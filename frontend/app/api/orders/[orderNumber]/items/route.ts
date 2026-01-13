@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { getPool, sql } from "@/lib/db";
 import jwt from "jsonwebtoken";
 
+/* ===============================
+   PUT /api/orders/[orderNumber]/items
+   =============================== */
 export async function PUT(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ orderNumber: string }> }
 ) {
+  /* ---------- AUTH ---------- */
   const auth = req.headers.get("authorization");
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,10 +20,15 @@ export async function PUT(
     process.env.JWT_SECRET!
   ) as { userId: number };
 
-  const { id } = await params;
-  const orderId = Number(id);
-  const { items } = await req.json();
+  const { orderNumber } = await params;
+  if (!orderNumber) {
+    return NextResponse.json(
+      { error: "Invalid order number" },
+      { status: 400 }
+    );
+  }
 
+  const { items } = await req.json();
   if (!Array.isArray(items)) {
     return NextResponse.json({ error: "Invalid items" }, { status: 400 });
   }
@@ -30,15 +39,16 @@ export async function PUT(
   try {
     await tx.begin();
 
-    // Verify ownership + draft status
+    /* ---------- RESOLVE ORDER + OWNERSHIP ---------- */
     const orderRes = await tx
       .request()
-      .input("id", sql.Int, orderId)
+      .input("order_number", sql.VarChar, orderNumber)
       .input("user_id", sql.Int, user.userId)
       .query(`
-        SELECT status
+        SELECT id, status
         FROM orders
-        WHERE id = @id AND user_id = @user_id
+        WHERE order_number = @order_number
+          AND user_id = @user_id
       `);
 
     if (
@@ -52,7 +62,9 @@ export async function PUT(
       );
     }
 
-    // Remove old items
+    const orderId = orderRes.recordset[0].id;
+
+    /* ---------- REMOVE OLD ITEMS ---------- */
     await tx
       .request()
       .input("order_id", sql.Int, orderId)
@@ -60,12 +72,20 @@ export async function PUT(
 
     let total = 0;
 
-    // Insert new items
+    /* ---------- INSERT NEW ITEMS ---------- */
     for (const item of items) {
       const priceRes = await tx
         .request()
         .input("id", sql.VarChar, item.item_id)
-        .query(`SELECT price_usd FROM items WHERE id = @id`);
+        .query(`
+          SELECT price_usd
+          FROM items
+          WHERE id = @id
+        `);
+
+      if (priceRes.recordset.length === 0) {
+        throw new Error("Item not found");
+      }
 
       const price = priceRes.recordset[0].price_usd;
       total += price * item.quantity;
@@ -77,12 +97,22 @@ export async function PUT(
         .input("quantity", sql.Int, item.quantity)
         .input("price", sql.Decimal(10, 2), price)
         .query(`
-          INSERT INTO order_items (order_id, item_id, quantity, price)
-          VALUES (@order_id, @item_id, @quantity, @price)
+          INSERT INTO order_items (
+            order_id,
+            item_id,
+            quantity,
+            price
+          )
+          VALUES (
+            @order_id,
+            @item_id,
+            @quantity,
+            @price
+          )
         `);
     }
 
-    // Update total
+    /* ---------- UPDATE TOTAL ---------- */
     await tx
       .request()
       .input("total", sql.Decimal(10, 2), total)
@@ -95,10 +125,10 @@ export async function PUT(
 
     await tx.commit();
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
     await tx.rollback();
     return NextResponse.json(
-      { error: "Failed to update order" },
+      { error: (err as Error).message || "Failed to update order" },
       { status: 500 }
     );
   }

@@ -3,7 +3,7 @@ import { getPool, sql } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 
 type Body = {
-  order_id: number;
+  order_number: string;
   receiving_account_id?: number;
   sender_bank: string;
   reference_number: string;
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   }
 
   const {
-    order_id,
+    order_number,
     receiving_account_id,
     sender_bank,
     reference_number,
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     phone_last4,
   } = body;
 
-  if (!order_id || !sender_bank || !reference_number || amount == null) {
+  if (!order_number || !sender_bank || !reference_number || amount == null) {
     return NextResponse.json(
       { error: "Missing required fields" },
       { status: 400 }
@@ -56,15 +56,16 @@ export async function POST(req: Request) {
     await tx.begin();
 
     /* --------------------------------------------------
-       1) Verify order ownership + status
+       1) Resolve order + verify ownership + status
        -------------------------------------------------- */
     const orderRes = await new sql.Request(tx)
-      .input("order_id", sql.Int, order_id)
+      .input("order_number", sql.VarChar, order_number)
       .input("user_id", sql.Int, user.userId)
       .query(`
         SELECT id, total_amount, status
         FROM dbo.orders
-        WHERE id = @order_id AND user_id = @user_id
+        WHERE order_number = @order_number
+          AND user_id = @user_id
       `);
 
     if (orderRes.recordset.length === 0) {
@@ -73,6 +74,7 @@ export async function POST(req: Request) {
     }
 
     const order = orderRes.recordset[0];
+    const orderId = order.id;
 
     if (order.status !== "pending_payment") {
       await tx.rollback();
@@ -86,7 +88,7 @@ export async function POST(req: Request) {
        2) Prevent duplicate payment submissions
        -------------------------------------------------- */
     const existingPayment = await new sql.Request(tx)
-      .input("order_id", sql.Int, order_id)
+      .input("order_id", sql.Int, orderId)
       .query(`
         SELECT 1
         FROM dbo.payments
@@ -108,7 +110,7 @@ export async function POST(req: Request) {
     const orderTotal = Number(order.total_amount);
     const submittedAmount = Number(amount);
 
-    if (Number.isNaN(submittedAmount) || submittedAmount <= 0) {
+    if (!Number.isFinite(submittedAmount) || submittedAmount <= 0) {
       await tx.rollback();
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
@@ -122,10 +124,11 @@ export async function POST(req: Request) {
     }
 
     /* --------------------------------------------------
-       4) Insert payment (status = submitted)
+       4) Insert payment (snapshot order_number)
        -------------------------------------------------- */
     const insertRes = await new sql.Request(tx)
-      .input("order_id", sql.Int, order_id)
+      .input("order_id", sql.Int, orderId)
+      .input("order_number", sql.VarChar, order_number)
       .input("user_id", sql.Int, user.userId)
       .input("method", sql.VarChar, "pago_movil")
       .input("receiving_account_id", sql.Int, receiving_account_id ?? null)
@@ -135,10 +138,10 @@ export async function POST(req: Request) {
       .input("phone_last4", sql.VarChar, phone_last4?.trim() ?? null)
       .query(`
         INSERT INTO dbo.payments
-          (order_id, user_id, method, receiving_account_id, sender_bank, reference_number, amount, phone_last4, status)
+          (order_id, order_number, user_id, method, receiving_account_id, sender_bank, reference_number, amount, phone_last4, status)
         OUTPUT INSERTED.id
         VALUES
-          (@order_id, @user_id, @method, @receiving_account_id, @sender_bank, @reference_number, @amount, @phone_last4, 'submitted')
+          (@order_id, @order_number, @user_id, @method, @receiving_account_id, @sender_bank, @reference_number, @amount, @phone_last4, 'submitted')
       `);
 
     const paymentId = insertRes.recordset[0].id;
@@ -147,7 +150,7 @@ export async function POST(req: Request) {
        5) Move order → under_review
        -------------------------------------------------- */
     await new sql.Request(tx)
-      .input("order_id", sql.Int, order_id)
+      .input("order_id", sql.Int, orderId)
       .query(`
         UPDATE dbo.orders
         SET status = 'under_review'
@@ -159,7 +162,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       message: "Payment submitted for review",
       payment_id: paymentId,
-      order_id,
+      order_number,
       new_order_status: "under_review",
     });
   } catch (err: any) {

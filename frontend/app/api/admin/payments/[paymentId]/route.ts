@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     .input("status", sql.VarChar(50), status)
     .query(`
       SELECT
-        p.id,
+        p.order_number,
         p.order_id,
         p.user_id,
         p.amount,
