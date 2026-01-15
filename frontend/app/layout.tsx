@@ -13,6 +13,15 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
+        {/* ✅ Favicon */}
+        <link rel="icon" href="/favicon.ico" />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="48x48"
+        />
+
+        {/* ✅ Structured data */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
