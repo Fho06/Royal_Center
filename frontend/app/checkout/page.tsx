@@ -34,6 +34,7 @@ export default function CheckoutPage() {
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [editingAddress, setEditingAddress] = useState<any>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
 
   const [fulfillmentType, setFulfillmentType] = useState<"delivery" | "pickup">("delivery");
 
@@ -62,15 +63,38 @@ export default function CheckoutPage() {
   }
 
   useEffect(() => {
-    loadAddresses();
-  }, []);
+      loadAddresses();
+    }, []);
 
-  const subtotal = useMemo(
-    () => cart.reduce((s, i) => s + i.price * i.quantity, 0),
-    [cart]
-  );
+    const subtotal = useMemo(
+      () => cart.reduce((s, i) => s + i.price * i.quantity, 0),
+      [cart]
+    );
+    useEffect(() => {
+    if (fulfillmentType !== "delivery") {
+      setDeliveryFee(0);
+      return;
+    }
 
-  const total = subtotal + tip;
+    if (subtotal <= 0) {
+      setDeliveryFee(0);
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await apiRequest(
+          `/pricing/delivery-fee?subtotal=${subtotal.toFixed(2)}`
+        );
+        setDeliveryFee(Number(res.fee ?? res.data?.fee ?? 0));
+      } catch {
+        setDeliveryFee(0); // safe fallback
+      }
+    })();
+  }, [subtotal, fulfillmentType]);
+
+
+  const total = subtotal + (fulfillmentType === "delivery" ? deliveryFee ?? 0 : 0) + tip;
 
   function handleGoToReview() {
     setError("");
@@ -284,6 +308,15 @@ export default function CheckoutPage() {
           <span>Subtotal</span>
           <span>${subtotal.toFixed(2)}</span>
         </div>
+        {fulfillmentType === "delivery" && deliveryFee !== null && (
+        <div className="flex justify-between">
+          <span>Entrega</span>
+          <span>
+            {deliveryFee === 0 ? "Gratis" : `$${deliveryFee.toFixed(2)}`}
+          </span>
+        </div>
+      )}
+
 
 {/*
         <div className="flex justify-between">

@@ -26,6 +26,7 @@ const BANKS = [
   "Banesco",
   "Mercantil",
   "Provincial",
+  "Otro"
 ];
 
 export default function PagoMovilPage() {
