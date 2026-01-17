@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPool, sql } from "@/lib/db";
+import { getDeliveryFee } from "@/lib/pricing/deliveryFee";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
@@ -195,7 +196,13 @@ export async function POST(req: Request) {
         }
       }
 
-      const totalBs = subtotal * exchangeRate;
+      let deliveryFee = 0;
+
+      if (fulfillment_type === "delivery") {
+        deliveryFee = await getDeliveryFee(subtotal);
+      }
+
+      const totalBs = (deliveryFee + subtotal) * exchangeRate;
 
       const MAX_TRIES = 5;
       let orderNumber = "";
@@ -213,6 +220,7 @@ export async function POST(req: Request) {
             .input("order_number", sql.VarChar(30), orderNumber)
             .input("subtotal", sql.Decimal(12, 2), subtotal)
             .input("tax", sql.Decimal(12, 2), taxAmount)
+            .input("delivery_fee", sql.Decimal(12, 2), deliveryFee)
             .input("total", sql.Decimal(12, 2), totalBs)
             .input("address_id", sql.Int, address_id ?? null)
             .input("fulfillment_type", sql.VarChar, fulfillment_type)
@@ -225,6 +233,7 @@ export async function POST(req: Request) {
                 order_number,
                 subtotal,
                 tax_amount,
+                delivery_fee,
                 total_amount,
                 address_id,
                 fulfillment_type,
@@ -239,6 +248,7 @@ export async function POST(req: Request) {
                 @order_number,
                 @subtotal,
                 @tax,
+                @delivery_fee,
                 @total,
                 @address_id,
                 @fulfillment_type,
