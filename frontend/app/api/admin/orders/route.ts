@@ -56,6 +56,13 @@ export async function GET(req: Request) {
       SELECT
         o.order_number,
         o.created_at,
+        CONVERT(
+          varchar(33),
+          o.created_at AT TIME ZONE 'UTC'
+                      AT TIME ZONE 'SA Western Standard Time',
+          126
+        ) AS created_at_ve,
+
         o.status,
         s.label AS status_label,
 

@@ -16,6 +16,7 @@ type Order = {
   status: string;
   status_label: string;
   created_at: string;
+  created_at_ve: string;
 
   total_amount: number;
   subtotal: number;
@@ -161,7 +162,11 @@ export default function AdminOrdersPage() {
                 Orden #{o.order_number}
               </p>
               <p className="text-sm text-gray-500">
-                {new Date(o.created_at).toLocaleString()}
+                {new Date(o.created_at_ve).toLocaleString("es-VE", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                    timeZone: "America/Caracas",
+                  })}
               </p>
             </div>
 

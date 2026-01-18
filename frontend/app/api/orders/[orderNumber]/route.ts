@@ -45,7 +45,13 @@ export async function GET(
           o.total_amount,
           o.status,
           s.label AS status_label,
-          o.created_at
+          o.created_at,
+          CONVERT(
+            varchar(33),
+            o.created_at AT TIME ZONE 'UTC'
+                        AT TIME ZONE 'SA Western Standard Time',
+            126
+          ) AS created_at_ve
         FROM orders o
         JOIN order_statuses s
           ON s.code = o.status

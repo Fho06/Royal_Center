@@ -15,6 +15,7 @@ type Order = {
   subtotal: number | string | null;
   tax_amount: number | string | null;
   tip_amount: number | string | null;
+  delivery_fee: number | string | null;
   total_amount: number | string | null;
 
   fulfillment_type: "delivery" | "pickup";
@@ -88,8 +89,8 @@ export default function AdminOrderDetailPage() {
   if (!order) return null;
 
   const subtotal = toNumber(order.subtotal);
-  const tax = toNumber(order.tax_amount);
   const tip = toNumber(order.tip_amount);
+  const delivery = toNumber(order.delivery_fee);
   const total = toNumber(order.total_amount);
 
   return (
@@ -127,14 +128,14 @@ export default function AdminOrderDetailPage() {
       <section>
         <h2 className="font-semibold mb-2">Artículos</h2>
         <div className="space-y-2">
-          {items.map(i => (
+          {items.map((i, idx) => (
             <div
-              key={i.item_id}
+              key={`${i.item_id}-${idx}`}
               className="border p-2 rounded"
             >
               <p>{i.name}</p>
               <p className="text-sm">
-                {i.quantity} × Bs. {i.price.toFixed(2)}
+                {i.quantity} × $ {i.price.toFixed(2)}
               </p>
             </div>
           ))}
@@ -142,9 +143,9 @@ export default function AdminOrderDetailPage() {
       </section>
 
       <section className="font-semibold space-y-1">
-        <p>Subtotal: Bs. {subtotal.toFixed(2)}</p>
-        <p>Tax: Bs. {tax.toFixed(2)}</p>
-        <p>Tip: Bs. {tip.toFixed(2)}</p>
+        <p>Subtotal: $ {subtotal.toFixed(2)}</p>
+        <p>Tip: $ {tip.toFixed(2)}</p>
+        <p>Delivery Fee: $ {delivery.toFixed(2)}</p>
         <p>Total: Bs. {total.toFixed(2)}</p>
       </section>
     </main>
