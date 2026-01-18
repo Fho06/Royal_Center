@@ -28,7 +28,7 @@ type CartContextType = {
 
   increaseQty: (item: string) => void;
   decreaseQty: (itemId: string) => void;
-
+  removeItem: (itemId: string) => void;
   clearCart: () => void;
   cartCount: number;
 };
@@ -154,9 +154,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-
-
-
   function decreaseQty(itemId: string) {
     setCart(prev =>
       prev
@@ -167,6 +164,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         )
         .filter(c => c.quantity > 0)
     );
+  }
+
+  function removeItem(itemId: string) {
+    setCart(prev => prev.filter(c => c.item_id !== itemId));
   }
 
   function clearCart() {
@@ -185,6 +186,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         addToCart,
         increaseQty,
         decreaseQty,
+        removeItem,
         clearCart,
         cartCount, // ✅ EXPOSED HERE
       }}
