@@ -72,7 +72,7 @@ export async function GET(req: Request) {
           o.created_at AT TIME ZONE 'UTC'
                       AT TIME ZONE 'SA Western Standard Time',
           126
-        ) AS created_at_ve.
+        ) AS created_at_ve,
         u.phone
       FROM orders o
       JOIN order_statuses s ON s.code = o.status
