@@ -24,7 +24,16 @@ type Order = {
   status: string;
   status_label: string;
   created_at: string;
+  created_at_ve: string;
 };
+
+function formatVenezuelaDate(date: string) {
+  return new Date(date).toLocaleString("es-VE", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "America/Caracas",
+  });
+}
 
 function OrderItemRow({ item }: { item: OrderItem }) {
   const [extIndex, setExtIndex] = useState(0);
@@ -81,7 +90,6 @@ export default function OrderDetailsPage() {
   const params = useParams();
   const { loading: authLoading, isAuthenticated } = useAuth();
 
-  // ✅ FIX: unified param name
   const orderNumber = params.orderNumber as string;
 
   const [order, setOrder] = useState<Order | null>(null);
@@ -119,7 +127,7 @@ export default function OrderDetailsPage() {
   }, [authLoading, isAuthenticated, orderNumber, router]);
 
   if (authLoading || loading) {
-    return <div className="p-6">Loading order…</div>;
+    return <div className="p-6">Cargando orden…</div>;
   }
 
   if (error) {
@@ -127,22 +135,22 @@ export default function OrderDetailsPage() {
   }
 
   if (!order) {
-    return <div className="p-6">Order not found.</div>;
+    return <div className="p-6">Orden no fue encontrada.</div>;
   }
 
   return (
     <main className="p-6 max-w-3xl mx-auto space-y-6 mt-3">
       <div>
         <h1 className="text-2xl font-bold">
-          Order #{order.order_number}
+          Orden #{order.order_number}
         </h1>
 
         <p className="text-sm text-gray-500">
-          {new Date(order.created_at).toLocaleString()}
+          {formatVenezuelaDate(order.created_at_ve)}
         </p>
 
         <p className="mt-2 text-md">
-          Status:{" "}
+          Estado:{" "}
           <span className="font-semibold">
             {order.status_label}
           </span>

@@ -37,17 +37,25 @@ export async function POST(req: Request) {
 
   if (!order_number || !sender_bank || !reference_number || amount == null) {
     return NextResponse.json(
-      { error: "Missing required fields" },
+      { error: "Faltan campos requeridos" },
       { status: 400 }
     );
   }
 
   if (String(reference_number).trim().length < 4) {
     return NextResponse.json(
-      { error: "Invalid reference number" },
+      { error: "Entre un numero de referencia valido" },
       { status: 400 }
     );
   }
+
+  if (phone_last4 && !/^\d{4}$/.test(phone_last4.trim())) {
+    return NextResponse.json(
+      { error: "El teléfono debe tener exactamente 4 dígitos" },
+      { status: 400 }
+    );
+  }
+
 
   const pool = await getPool();
   const tx = new sql.Transaction(pool);
@@ -99,7 +107,7 @@ export async function POST(req: Request) {
     if (existingPayment.recordset.length > 0) {
       await tx.rollback();
       return NextResponse.json(
-        { error: "Payment already submitted for this order" },
+        { error: "El pago de este pedido ya ha sido realizado." },
         { status: 409 }
       );
     }
@@ -118,7 +126,7 @@ export async function POST(req: Request) {
     if (submittedAmount !== orderTotal) {
       await tx.rollback();
       return NextResponse.json(
-        { error: "Amount mismatch with order total" },
+        { error: "El monto no coincide con el total de la orden" },
         { status: 400 }
       );
     }
@@ -160,7 +168,7 @@ export async function POST(req: Request) {
     await tx.commit();
 
     return NextResponse.json({
-      message: "Payment submitted for review",
+      message: "Pago enviado para revisión",
       payment_id: paymentId,
       order_number,
       new_order_status: "under_review",
@@ -170,16 +178,8 @@ export async function POST(req: Request) {
       await tx.rollback();
     } catch {}
 
-    const msg = String(err?.message ?? "");
-    if (msg.toLowerCase().includes("ux_payments_reference_method")) {
-      return NextResponse.json(
-        { error: "Reference number already used" },
-        { status: 409 }
-      );
-    }
-
     return NextResponse.json(
-      { error: "Failed to submit payment" },
+      { error: "Error al enviar el pago" },
       { status: 500 }
     );
   }

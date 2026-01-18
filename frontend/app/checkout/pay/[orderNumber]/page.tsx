@@ -21,6 +21,7 @@ type PaymentAccount = {
 };
 
 const BANKS = [
+  "BBVA Provincial",
   "Banco de Venezuela",
   "Banco Plaza",
   "Banesco",
@@ -165,7 +166,13 @@ export default function PagoMovilPage() {
               <input
                 placeholder="Últimos 4 dígitos del teléfono"
                 value={phoneLast4}
-                onChange={(e) => setPhoneLast4(e.target.value)}
+                inputMode="numeric"
+                pattern="\d{4}"
+                maxLength={4}
+                onChange={(e) => {
+                  const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 4);
+                  setPhoneLast4(digitsOnly);
+                }}
                 className="w-full border rounded px-3 py-2"
               />
             </div>
