@@ -19,7 +19,7 @@ export function NavbarCart({
   closeCart,
   onMobileClick,
 }: Props) {
-  const { cart, cartCount, increaseQty, decreaseQty, clearCart } = useCart();
+  const { cart, cartCount, increaseQty, decreaseQty, removeItem, clearCart } = useCart();
 
   const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
@@ -29,10 +29,21 @@ export function NavbarCart({
       onMouseEnter={!isTouch ? openCart : undefined}
       onMouseLeave={!isTouch ? closeCart : undefined}
     >
-      {/* CART BUTTON (matches your original click behavior) */}
+      {/* CART BUTTON */}
+      {/* MOBILE */}
       <button
-        onClick={() => {
-          if (isTouch) onMobileClick();
+        onClick={(e) => {
+          if (!isTouch) return;
+
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (!open) {
+            openCart();
+            return;
+          }
+
+          onMobileClick();
         }}
         className="relative flex items-center pr-1"
       >
@@ -51,15 +62,15 @@ export function NavbarCart({
         )}
       </button>
 
-      {/* DESKTOP ONLY CART PREVIEW */}
-      {!isTouch && open && (
+      {/* DESKTOP*/}
+      {open && (
         <div className="absolute right-0 top-full mt-2 w-80">
           <CartSidebar
             cart={cart}
             total={total}
             increase={increaseQty}
             decrease={decreaseQty}
-            remove={clearCart}
+            remove={removeItem}
           />
         </div>
       )}
