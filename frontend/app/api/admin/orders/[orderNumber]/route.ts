@@ -38,16 +38,41 @@ export async function GET(
     const orderRes = await pool
       .request()
       .input("order_number", sql.VarChar, orderNumber)
-      .input("user_id", sql.Int, user.userId)
       .query(`
         SELECT
           o.order_number,
+
+          /* USER */
+          u.phone,
+          u.email,
+          CONCAT(
+            COALESCE(u.first_name, ''),
+            ' ',
+            COALESCE(u.last_name, '')
+          ) AS customer_name,
+
+          /* ORDER */
+          o.status,
+          s.label AS status_label,
+          o.payment_method,
+          o.fulfillment_type,
+          o.notes,
+
+          /* MONEY */
           o.subtotal,
+          o.tax_amount,
           o.tip_amount,
           o.delivery_fee,
           o.total_amount,
-          o.status,
-          s.label AS status_label,
+
+          /* ADDRESS (nullable) */
+          a.address_1,
+          a.address_2,
+          a.city,
+          a.state,
+          a.country,
+
+          /* DATES */
           o.created_at,
           CONVERT(
             varchar(33),
@@ -55,12 +80,18 @@ export async function GET(
                         AT TIME ZONE 'SA Western Standard Time',
             126
           ) AS created_at_ve
+
         FROM orders o
-        JOIN order_statuses s
+        LEFT JOIN users u
+          ON u.user_id = o.user_id
+        LEFT JOIN user_addresses a
+          ON a.address_id = o.address_id
+        LEFT JOIN order_statuses s
           ON s.code = o.status
+
         WHERE o.order_number = @order_number
-          AND o.user_id = @user_id
       `);
+
 
     if (orderRes.recordset.length === 0) {
       return NextResponse.json(

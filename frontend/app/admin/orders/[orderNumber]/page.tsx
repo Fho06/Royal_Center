@@ -6,11 +6,18 @@ import { useParams, useRouter } from "next/navigation";
 
 type Order = {
   order_number: string;
-  email: string;
-  phone: string;
+
+  phone: string | null;
+  email: string | null;
+  customer_name: string | null;
+
   status: string;
   status_label: string;
-  created_at: string;
+
+  payment_method: string;
+  fulfillment_type: "delivery" | "pickup";
+
+  notes: string | null;
 
   subtotal: number | string | null;
   tax_amount: number | string | null;
@@ -18,14 +25,11 @@ type Order = {
   delivery_fee: number | string | null;
   total_amount: number | string | null;
 
-  fulfillment_type: "delivery" | "pickup";
-  payment_method: string;
-
-  address_1?: string;
-  address_2?: string;
-  city?: string;
-  state?: string;
-  country?: string;
+  address_1?: string | null;
+  address_2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
 };
 
 type Item = {
@@ -55,6 +59,11 @@ export default function AdminOrderDetailPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const FULFILLMENT_LABELS: Record<"pickup" | "delivery", string> = {
+    pickup: "Retiro en tienda",
+    delivery: "Entrega a domicilio",
+  };
+
 
   useEffect(() => {
     if (!orderNumber) {
@@ -107,12 +116,24 @@ export default function AdminOrderDetailPage() {
       </h1>
 
       <section className="space-y-1">
-        <p><b>Teléfono:</b> {order.phone}</p>
-        <p><b>Email:</b> {order.email}</p>
+        <p><b>Cliente:</b> {order.customer_name || "—"}</p>
+        <p><b>Teléfono:</b> {order.phone || "—"}</p>
+        <p><b>Email:</b> {order.email || "—"}</p>
         <p><b>Estado:</b> {order.status_label}</p>
         <p><b>Método de Pago:</b> {order.payment_method}</p>
-        <p><b>Método de Entrega:</b> {order.fulfillment_type}</p>
+        <p><b>Método de Entrega:</b>{" "}
+          {FULFILLMENT_LABELS[order.fulfillment_type] ?? order.fulfillment_type}
+        </p>
       </section>
+      {order.notes && (
+        <section className="space-y-1">
+          <h2 className="font-semibold">Notas del Cliente</h2>
+          <p className="italic border p-2 rounded bg-gray-50">
+            {order.notes}
+          </p>
+        </section>
+      )}
+
 
       {order.fulfillment_type === "delivery" && (
         <section className="space-y-1">
@@ -144,8 +165,8 @@ export default function AdminOrderDetailPage() {
 
       <section className="font-semibold space-y-1">
         <p>Subtotal: $ {subtotal.toFixed(2)}</p>
-        <p>Tip: $ {tip.toFixed(2)}</p>
-        <p>Delivery Fee: $ {delivery.toFixed(2)}</p>
+        <p>Propina: $ {tip.toFixed(2)}</p>
+        <p>Tarifa de entrega: $ {delivery.toFixed(2)}</p>
         <p>Total: Bs. {total.toFixed(2)}</p>
       </section>
     </main>
