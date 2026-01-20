@@ -23,7 +23,6 @@ type PaymentAccount = {
 const BANKS = [
   "BBVA Provincial",
   "Banco de Venezuela",
-  "Banco Plaza",
   "Banesco",
   "Mercantil",
   "Provincial",

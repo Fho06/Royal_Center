@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { CartProvider } from "@/app/context/CartContext";
 import { AuthProvider } from "@/app/context/AuthContext";
 import Navbar from "@/app/components/navbar/Navbar";
+import ContactUI from "@/app/components/contact/ContactUI"; // 👈 ADD
 
 export default function RootLayout({
   children,
@@ -13,15 +14,9 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
-        {/* ✅ Favicon */}
         <link rel="icon" href="/favicon.ico" />
-        <link
-          rel="icon"
-          type="image/png"
-          sizes="48x48"
-        />
+        <link rel="icon" type="image/png" sizes="48x48" />
 
-        {/* ✅ Structured data */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -43,6 +38,9 @@ export default function RootLayout({
             </Suspense>
 
             {children}
+
+
+            <ContactUI />
           </CartProvider>
         </AuthProvider>
       </body>
