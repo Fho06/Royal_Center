@@ -199,7 +199,7 @@ export default function CheckoutPage() {
                   className="w-full checkout-card px-3 py-2 text-sm"
                 >
                   <option value="royal_center_main">
-                    Royal Center – Principal
+                    Royal Center – 29
                   </option>
                 </select>
               </div>

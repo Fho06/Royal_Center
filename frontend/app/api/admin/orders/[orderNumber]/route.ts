@@ -45,6 +45,7 @@ export async function GET(
           /* USER */
           u.phone,
           u.email,
+          u.rif,
           CONCAT(
             COALESCE(u.first_name, ''),
             ' ',
