@@ -6,8 +6,7 @@ export function ContactModal({ onClose }: { onClose: () => void }) {
       <div className="bg-white w-full max-w-sm rounded-t-2xl p-4">
         <h2 className="font-semibold mb-3">Contacto</h2>
 
-        <p>📞 <a href="tel:+584120182319">+58 412-0182319</a></p>
-        <p>✉️ <a href="mailto:p.royalcenter@gmail.com">p.royalcenter@gmail.com</a></p>
+        <p>Whatsapp <a href="tel:+584120182319">+58 412-0182319</a></p>
 
         <button onClick={onClose} className="mt-4 w-full bg-gray-100 py-2 rounded">
           Cerrar

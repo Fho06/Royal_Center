@@ -10,6 +10,7 @@ type Order = {
   phone: string | null;
   email: string | null;
   customer_name: string | null;
+  rif: string | null;
 
   status: string;
   status_label: string;
@@ -38,6 +39,18 @@ type Item = {
   quantity: number;
   price: number;
 };
+
+const STATUS_LABELS_ES: Record<string, string> = {
+  pending_payment: "Pago Pendiente",
+  under_review: "Bajo Revisión",
+  order_placed: "Orden Aceptada",
+  picking_up: "En Camino a la Tienda",
+  en_route: "En Camino",
+  delivered: "Entregado",
+  refunded: "Reembolsado",
+  cancelled: "Cancelado",
+};
+
 
 function toNumber(value: number | string | null | undefined) {
   const n = Number(value);
@@ -117,9 +130,11 @@ export default function AdminOrderDetailPage() {
 
       <section className="space-y-1">
         <p><b>Cliente:</b> {order.customer_name || "—"}</p>
+        <p><b>RIF:</b> {order.rif || "—"}</p>
         <p><b>Teléfono:</b> {order.phone || "—"}</p>
         <p><b>Email:</b> {order.email || "—"}</p>
-        <p><b>Estado:</b> {order.status_label}</p>
+        <p><b>Estado:</b>{" "}
+              {STATUS_LABELS_ES[order.status] ?? order.status_label ?? order.status}</p>
         <p><b>Método de Pago:</b> {order.payment_method}</p>
         <p><b>Método de Entrega:</b>{" "}
           {FULFILLMENT_LABELS[order.fulfillment_type] ?? order.fulfillment_type}
